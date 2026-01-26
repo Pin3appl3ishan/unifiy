@@ -4,19 +4,20 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirro
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { useCanvasStore, type CodePad as CodePadType } from "../../stores/canvasStore";
+import { CodePad as CodePadType } from "../../stores/localSceneStore";
 
 interface CodePadProps {
   codePad: CodePadType;
-  canvasId: string;
   isDarkMode?: boolean;
+  isReadOnly?: boolean;
+  onUpdate: (updates: Partial<CodePadType>) => void;
+  onRemove: () => void;
 }
 
-export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodePadProps) {
+export default function CodePad({ codePad, isDarkMode = false, isReadOnly = false, onUpdate, onRemove }: CodePadProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const { updateCodePad, removeCodePad } = useCanvasStore();
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -31,12 +32,6 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       javascript(),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          const newCode = update.state.doc.toString();
-          updateCodePad(canvasId, codePad.id, { code: newCode });
-        }
-      }),
       EditorView.theme({
         "&": {
           height: "100%",
@@ -48,6 +43,23 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
         },
       }),
     ];
+
+    // Add update listener only if not read-only
+    if (!isReadOnly) {
+      extensions.push(
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            const newCode = update.state.doc.toString();
+            onUpdate({ code: newCode });
+          }
+        })
+      );
+    }
+
+    // Make editor read-only if needed
+    if (isReadOnly) {
+      extensions.push(EditorState.readOnly.of(true));
+    }
 
     if (isDarkMode) {
       extensions.push(oneDark);
@@ -69,12 +81,12 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
       view.destroy();
       viewRef.current = null;
     };
-  }, [isDarkMode]); // Re-create on theme change
+  }, [isDarkMode, isReadOnly]); // Re-create on theme change or read-only change
 
   // Handle dragging
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.codepad-editor')) return;
-    
+
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - codePad.x,
@@ -86,7 +98,7 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      updateCodePad(canvasId, codePad.id, {
+      onUpdate({
         x: e.clientX - dragOffset.x,
         y: e.clientY - dragOffset.y,
       });
@@ -101,7 +113,7 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, dragOffset, canvasId, codePad.id, updateCodePad]);
+  }, [isDragging, dragOffset, onUpdate]);
 
   // Handle resizing
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -115,7 +127,7 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
     const handleMouseMove = (e: MouseEvent) => {
       const newWidth = Math.max(250, e.clientX - codePad.x);
       const newHeight = Math.max(150, e.clientY - codePad.y);
-      updateCodePad(canvasId, codePad.id, { width: newWidth, height: newHeight });
+      onUpdate({ width: newWidth, height: newHeight });
     };
 
     const handleMouseUp = () => setIsResizing(false);
@@ -127,14 +139,14 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing, codePad.x, codePad.y, canvasId, codePad.id, updateCodePad]);
+  }, [isResizing, codePad.x, codePad.y, onUpdate]);
 
   const handleClose = () => {
-    removeCodePad(canvasId, codePad.id);
+    onRemove();
   };
 
   const handleMinimize = () => {
-    updateCodePad(canvasId, codePad.id, { isMinimized: !codePad.isMinimized });
+    onUpdate({ isMinimized: !codePad.isMinimized });
   };
 
   if (codePad.isMinimized) {
@@ -146,9 +158,9 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
           left: codePad.x,
           top: codePad.y,
           width: 200,
-          cursor: "move",
+          cursor: isReadOnly ? "default" : "move",
         }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={isReadOnly ? undefined : handleMouseDown}
       >
         <div className="codepad-header">
           <div className="flex items-center gap-2">
@@ -156,15 +168,22 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
               JS
             </span>
             <span className="text-sm truncate">CodePad</span>
+            {isReadOnly && (
+              <span className="text-xs bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">
+                Read-only
+              </span>
+            )}
           </div>
-          <div className="flex gap-1">
-            <button
-              onClick={handleMinimize}
-              className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-            >
-              □
-            </button>
-          </div>
+          {!isReadOnly && (
+            <div className="flex gap-1">
+              <button
+                onClick={handleMinimize}
+                className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+              >
+                □
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -183,9 +202,9 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
       }}
     >
       {/* Header */}
-      <div 
-        className="codepad-header cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
+      <div
+        className={`codepad-header ${isReadOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+        onMouseDown={isReadOnly ? undefined : handleMouseDown}
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono bg-amber-500 text-white px-2 py-0.5 rounded">
@@ -194,40 +213,49 @@ export default function CodePad({ codePad, canvasId, isDarkMode = false }: CodeP
           <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
             CodePad
           </span>
+          {isReadOnly && (
+            <span className="text-xs bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded">
+              Read-only
+            </span>
+          )}
         </div>
-        <div className="flex gap-1">
-          <button
-            onClick={handleMinimize}
-            className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-slate-500"
-            title="Minimize"
-          >
-            −
-          </button>
-          <button
-            onClick={handleClose}
-            className="w-6 h-6 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-slate-500 hover:text-red-500"
-            title="Close"
-          >
-            ×
-          </button>
-        </div>
+        {!isReadOnly && (
+          <div className="flex gap-1">
+            <button
+              onClick={handleMinimize}
+              className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-slate-500"
+              title="Minimize"
+            >
+              −
+            </button>
+            <button
+              onClick={handleClose}
+              className="w-6 h-6 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-slate-500 hover:text-red-500"
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Editor */}
-      <div 
-        ref={editorRef} 
+      <div
+        ref={editorRef}
         className="codepad-editor"
         style={{ height: `calc(100% - 40px)` }}
       />
 
-      {/* Resize Handle */}
-      <div
-        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
-        onMouseDown={handleResizeStart}
-        style={{
-          background: "linear-gradient(135deg, transparent 50%, #94a3b8 50%)",
-        }}
-      />
+      {/* Resize Handle - hidden in read-only mode */}
+      {!isReadOnly && (
+        <div
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+          onMouseDown={handleResizeStart}
+          style={{
+            background: "linear-gradient(135deg, transparent 50%, #94a3b8 50%)",
+          }}
+        />
+      )}
     </div>
   );
 }
