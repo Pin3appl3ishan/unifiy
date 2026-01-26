@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Excalidraw, MainMenu, WelcomeScreen } from "@excalidraw/excalidraw";
 import {
@@ -9,29 +9,164 @@ import {
   LogIn,
   LogOut,
   User,
+  Code,
+  Lock,
 } from "lucide-react";
-import { useCanvasStore } from "../../stores/canvasStore";
+import { useLocalSceneStore, CodePad as CodePadType } from "../../stores/localSceneStore";
+import { useSceneStore, Scene } from "../../stores/sceneStore";
 import { useAuthStore } from "../../stores/authStore";
 import CodePad from "../CodePad/CodePad";
+import ShareModal from "../ShareModal/ShareModal";
+
+// Tier-based CodePad limits
+const MAX_CODEPADS_FREE = 3;
 
 interface WhiteboardProps {
-  canvasId: string;
+  sceneId?: string; // For logged-in users with remote scenes
+  isAnonymous?: boolean; // True for anonymous users using localStorage
+  isSharedView?: boolean; // True when viewing via share link
+  sharedScene?: Scene; // Pre-loaded scene for shared view (avoids auth fetch)
+  viewModeEnabled?: boolean; // True to disable editing (view-only mode)
 }
 
-export default function Whiteboard({ canvasId }: WhiteboardProps) {
+export default function Whiteboard({
+  sceneId,
+  isAnonymous = false,
+  isSharedView = false,
+  sharedScene,
+  viewModeEnabled = false,
+}: WhiteboardProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const excalidrawAPIRef = useRef<any>(null);
   const navigate = useNavigate();
 
-  const { canvases, saveExcalidrawData, addCodePad, updateCanvasName } = useCanvasStore();
-  const { user, signOut } = useAuthStore();
+  // Local scene store (anonymous users)
+  const localScene = useLocalSceneStore((s) => s.scene);
+  const localSaveExcalidrawData = useLocalSceneStore((s) => s.saveExcalidrawData);
+  const localAddCodePad = useLocalSceneStore((s) => s.addCodePad);
+  const localUpdateCodePad = useLocalSceneStore((s) => s.updateCodePad);
+  const localRemoveCodePad = useLocalSceneStore((s) => s.removeCodePad);
+  const localUpdateScene = useLocalSceneStore((s) => s.updateScene);
 
-  const canvas = canvases[canvasId];
+  // Remote scene store (logged-in users)
+  const remoteScene = useSceneStore((s) => s.currentScene);
+  const remoteSaveSceneData = useSceneStore((s) => s.saveSceneData);
+  const remoteUpdateScene = useSceneStore((s) => s.updateScene);
+
+  // Auth
+  const { user, profile, signOut } = useAuthStore();
+
+  // Determine which scene to use
+  // Priority: sharedScene (for shared view) > localScene (anonymous) > remoteScene (authenticated)
+  const scene = sharedScene || (isAnonymous ? localScene : remoteScene);
+  const sceneName = scene?.name || "Untitled";
+  const sceneExcalidrawData = scene?.excalidrawData;
+  const sceneCodePads = scene?.codePads || [];
+  const sceneUpdatedAt = isAnonymous
+    ? (localScene?.updatedAt || Date.now())
+    : (remoteScene?.updatedAt ? new Date(remoteScene.updatedAt).getTime() : Date.now());
+
+  // Tier-based limit check
+  const canAddCodePad = !profile || profile.tier === "premium" || sceneCodePads.length < MAX_CODEPADS_FREE;
+
+  // Save handler based on mode
+  const handleSaveExcalidrawData = useCallback(
+    (data: any) => {
+      if (isAnonymous) {
+        localSaveExcalidrawData(data);
+      } else if (sceneId) {
+        remoteSaveSceneData(sceneId, { excalidrawData: data });
+      }
+    },
+    [isAnonymous, sceneId, localSaveExcalidrawData, remoteSaveSceneData]
+  );
+
+  // CodePad handlers - read from store state directly to avoid stale closures
+  const handleAddCodePad = useCallback(() => {
+    if (!canAddCodePad) return;
+
+    const centerX = window.innerWidth / 2 - 200;
+    const centerY = window.innerHeight / 2 - 150;
+
+    if (isAnonymous) {
+      localAddCodePad(centerX, centerY);
+    } else if (sceneId) {
+      // Read current CodePads from store to avoid stale closure
+      const currentCodePads = useSceneStore.getState().currentScene?.codePads || [];
+      const newCodePad: CodePadType = {
+        id: crypto.randomUUID(),
+        x: centerX,
+        y: centerY,
+        width: 400,
+        height: 300,
+        code: "// Start coding here...\n",
+        language: "javascript",
+        isMinimized: false,
+      };
+      remoteSaveSceneData(sceneId, {
+        codePads: [...currentCodePads, newCodePad],
+      });
+    }
+  }, [isAnonymous, sceneId, canAddCodePad, localAddCodePad, remoteSaveSceneData]);
+
+  const handleUpdateCodePad = useCallback(
+    (codePadId: string, updates: Partial<CodePadType>) => {
+      // Clamp resize values at state level to prevent invalid sizes
+      const clampedUpdates = { ...updates };
+      if (clampedUpdates.width !== undefined) {
+        clampedUpdates.width = Math.max(250, Math.min(clampedUpdates.width, window.innerWidth - 40));
+      }
+      if (clampedUpdates.height !== undefined) {
+        clampedUpdates.height = Math.max(150, Math.min(clampedUpdates.height, window.innerHeight - 40));
+      }
+
+      if (isAnonymous) {
+        localUpdateCodePad(codePadId, clampedUpdates);
+      } else if (sceneId) {
+        // Read current CodePads from store to avoid stale closure
+        const currentCodePads = useSceneStore.getState().currentScene?.codePads || [];
+        const updatedCodePads = currentCodePads.map((cp) =>
+          cp.id === codePadId ? { ...cp, ...clampedUpdates } : cp
+        );
+        remoteSaveSceneData(sceneId, { codePads: updatedCodePads });
+      }
+    },
+    [isAnonymous, sceneId, localUpdateCodePad, remoteSaveSceneData]
+  );
+
+  const handleRemoveCodePad = useCallback(
+    (codePadId: string) => {
+      if (isAnonymous) {
+        localRemoveCodePad(codePadId);
+      } else if (sceneId) {
+        // Read current CodePads from store to avoid stale closure
+        const currentCodePads = useSceneStore.getState().currentScene?.codePads || [];
+        const updatedCodePads = currentCodePads.filter((cp) => cp.id !== codePadId);
+        remoteSaveSceneData(sceneId, { codePads: updatedCodePads });
+      }
+    },
+    [isAnonymous, sceneId, localRemoveCodePad, remoteSaveSceneData]
+  );
+
+  // Name update handler
+  const handleUpdateName = useCallback(
+    (name: string) => {
+      if (isAnonymous) {
+        localUpdateScene({ name });
+      } else if (sceneId) {
+        remoteUpdateScene(sceneId, { name });
+      }
+    },
+    [isAnonymous, sceneId, localUpdateScene, remoteUpdateScene]
+  );
 
   // Auto-save with debounce
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleChange = useCallback(
     (elements: readonly any[], appState: any) => {
       // Track dark mode from Excalidraw
@@ -39,13 +174,13 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
         setIsDarkMode(appState.theme === "dark");
       }
 
-      // Debounce saves to prevent too many writes
+      // Debounce saves
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        saveExcalidrawData(canvasId, {
+        handleSaveExcalidrawData({
           elements,
           appState: {
             viewBackgroundColor: appState.viewBackgroundColor,
@@ -57,7 +192,7 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
         });
       }, 500);
     },
-    [canvasId, saveExcalidrawData]
+    [handleSaveExcalidrawData]
   );
 
   // Cleanup timeout on unmount
@@ -69,14 +204,7 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
     };
   }, []);
 
-  // Handle adding a CodePad
-  const handleAddCodePad = useCallback(() => {
-    const centerX = window.innerWidth / 2 - 200;
-    const centerY = window.innerHeight / 2 - 150;
-    addCodePad(canvasId, centerX, centerY);
-  }, [canvasId, addCodePad]);
-
-  // Keyboard shortcut for adding CodePad (Ctrl/Cmd + Shift + C)
+  // Keyboard shortcut for adding CodePad
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") {
@@ -98,15 +226,15 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
     navigate("/login");
   };
 
-  // Canvas name editing handlers
+  // Name editing handlers
   const handleNameDoubleClick = () => {
-    setEditedName(canvas?.name || "");
+    setEditedName(sceneName);
     setIsEditingName(true);
   };
 
   const handleNameSave = () => {
-    if (editedName.trim() && editedName !== canvas?.name) {
-      updateCanvasName(canvasId, editedName.trim());
+    if (editedName.trim() && editedName !== sceneName) {
+      handleUpdateName(editedName.trim());
     }
     setIsEditingName(false);
   };
@@ -127,14 +255,26 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
     }
   }, [isEditingName]);
 
-  // Check if user is free (not logged in) with only one canvas
-  const canvasCount = Object.keys(canvases).length;
-  const isFreeUserWithOneCanvas = !user && canvasCount <= 1;
+  // Show name for logged-in users only
+  const showSceneName = !isAnonymous && user;
 
-  if (!canvas) {
+  // Memoize CodePad handlers to prevent inline function re-creation on every render
+  // This fixes the re-centering bug caused by unstable callback references
+  const codePadHandlers = useMemo(() => {
+    const handlers: Record<string, { onUpdate: (updates: Partial<CodePadType>) => void; onRemove: () => void }> = {};
+    for (const cp of sceneCodePads) {
+      handlers[cp.id] = {
+        onUpdate: (updates) => handleUpdateCodePad(cp.id, updates),
+        onRemove: () => handleRemoveCodePad(cp.id),
+      };
+    }
+    return handlers;
+  }, [sceneCodePads, handleUpdateCodePad, handleRemoveCodePad]);
+
+  if (!scene) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-slate-500">Canvas not found</p>
+        <p className="text-slate-500">Scene not found</p>
       </div>
     );
   }
@@ -143,8 +283,8 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
 
   return (
     <div className="relative w-full h-full">
-      {/* Canvas Name - positioned next to the sidebar menu */}
-      {!isFreeUserWithOneCanvas && (
+      {/* Scene Name - positioned next to the sidebar menu */}
+      {showSceneName && (
         <div className="absolute top-[13px] left-[52px] z-50 flex items-center">
           {isEditingName ? (
             <input
@@ -164,7 +304,7 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
           ) : (
             <span
               onDoubleClick={handleNameDoubleClick}
-              className={`text-sm font-bold px-3 py-2 rounded cursor-pointer transition-colors ${
+              className={`text-sm font-bold px-3.5 py-3.5 rounded cursor-pointer transition-colors ${
                 isDarkMode
                   ? "text-slate-300 hover:bg-slate-700/50"
                   : "text-slate-600 hover:bg-slate-100"
@@ -172,56 +312,88 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
               style={{ fontFamily: "'SF Pro Display', 'SF Pro', system-ui, sans-serif" }}
               title="Double-click to rename"
             >
-              {canvas.name}
+              {sceneName}
             </span>
           )}
         </div>
       )}
 
-      {/* Last Saved Status - bottom right, left of FAB */}
+      {/* Last Saved Status */}
       <div className="absolute bottom-7 right-24 z-50 pointer-events-none">
         <span className="text-xs text-slate-400">
-          Last saved: {new Date(canvas.updatedAt).toLocaleTimeString()}
+          Last saved: {new Date(sceneUpdatedAt).toLocaleTimeString()}
         </span>
       </div>
 
       {/* Excalidraw Canvas */}
       <div className="excalidraw-wrapper">
         <Excalidraw
-          initialData={canvas.excalidrawData || undefined}
-          onChange={handleChange}
+          initialData={sceneExcalidrawData || undefined}
+          onChange={viewModeEnabled ? undefined : handleChange}
           theme={isDarkMode ? "dark" : "light"}
+          viewModeEnabled={viewModeEnabled}
+          excalidrawAPI={(api) => { excalidrawAPIRef.current = api; }}
           UIOptions={{
             canvasActions: {
-              loadScene: true,
+              loadScene: !viewModeEnabled,
               export: { saveFileToDisk: true },
               toggleTheme: true,
             },
           }}
+          renderTopRightUI={() => {
+            return (
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                {/* Share button - only for logged-in users with a scene, not in shared view */}
+                {user && sceneId && !isSharedView && (
+                  <button
+                    onClick={() => setShareModalOpen(true)}
+                    className="flex items-center justify-center rounded-md font-medium transition-colors"
+                    style={{
+                      height: 36,
+                      padding: "0 16px",
+                      backgroundColor: "#6366f1",
+                      color: "white",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#4f46e5";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#6366f1";
+                    }}
+                    title="Share scene"
+                  >
+                    Share
+                  </button>
+                )}
+
+              </div>
+            );
+          }}
         >
           <MainMenu>
-            {/* Section 1: File operations */}
             <MainMenu.DefaultItems.LoadScene />
             <MainMenu.DefaultItems.SaveToActiveFile />
             <MainMenu.DefaultItems.Export />
-            <MainMenu.Item
-              onSelect={() => {
-                /* TODO: Live collaboration */
-              }}
-              icon={<Users size={iconSize} />}
-            >
-              Live collaboration...
-            </MainMenu.Item>
+{/* Share button - only for logged-in users with a scene */}
+            {user && sceneId && (
+              <MainMenu.Item
+                onSelect={() => setShareModalOpen(true)}
+                icon={<Users size={iconSize} />}
+              >
+                Share scene...
+              </MainMenu.Item>
+            )}
             <MainMenu.DefaultItems.Help />
             <MainMenu.DefaultItems.ClearCanvas />
 
             <MainMenu.Separator />
 
-            {/* Section 2: U&I links */}
             <MainMenu.Item
-              onSelect={() => {
-                /* TODO: U&I Plus */
-              }}
+              onSelect={() => {}}
               icon={<Sparkles size={iconSize} />}
             >
               U&I Plus
@@ -261,7 +433,6 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
 
             <MainMenu.Separator />
 
-            {/* Section 3: Theme */}
             <MainMenu.DefaultItems.ToggleTheme />
             <MainMenu.DefaultItems.ChangeCanvasBackground />
           </MainMenu>
@@ -284,24 +455,75 @@ export default function Whiteboard({ canvasId }: WhiteboardProps) {
         </Excalidraw>
       </div>
 
-      {/* CodePads Layer */}
-      {canvas.codePads.map((codePad) => (
+      {/* CodePads Layer - using memoized handlers to prevent re-centering */}
+      {sceneCodePads.map((codePad) => (
         <CodePad
           key={codePad.id}
           codePad={codePad}
-          canvasId={canvasId}
           isDarkMode={isDarkMode}
+          isReadOnly={isSharedView || viewModeEnabled}
+          onUpdate={codePadHandlers[codePad.id]?.onUpdate}
+          onRemove={codePadHandlers[codePad.id]?.onRemove}
         />
       ))}
 
-      {/* Floating Action Button for CodePad */}
-      <button
-        onClick={handleAddCodePad}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-transform hover:scale-105 z-50"
-        title="Add CodePad (Ctrl+Shift+C)"
-      >
-        {"</>"}
-      </button>
+      {/* CodePad Button - positioned to RIGHT of top toolbar (hidden in shared view) */}
+      {!isSharedView && (
+        <div
+          className="absolute"
+          style={{
+            top: "17px",
+            left: "54.5%",
+            transform: "translateX(calc(50% + 200px))",
+            zIndex: 100,
+          }}
+        >
+        <div
+          className="flex items-center justify-center rounded-lg shadow-md"
+          style={{
+            backgroundColor: isDarkMode ? "#232329" : "#ffffff",
+            border: isDarkMode ? "1px solid #3d3d4a" : "1px solid #e2e8f0",
+          }}
+        >
+          <button
+            onClick={handleAddCodePad}
+            disabled={!canAddCodePad}
+            className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors"
+            style={{
+              color: isDarkMode ? "#a0a0a8" : "#4b5563",
+              cursor: canAddCodePad ? "pointer" : "not-allowed",
+              opacity: canAddCodePad ? 1 : 0.5,
+            }}
+            onMouseEnter={(e) => {
+              if (canAddCodePad) {
+                e.currentTarget.style.backgroundColor = isDarkMode ? "#3d3d4a" : "#f1f5f9";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+            title={canAddCodePad ? "CodePad (Ctrl+Shift+C)" : `Upgrade for more CodePads (${MAX_CODEPADS_FREE} max)`}
+          >
+            {canAddCodePad ? (
+              <Code size={20} strokeWidth={1.5} />
+            ) : (
+              <Lock size={18} strokeWidth={1.5} />
+            )}
+          </button>
+        </div>
+      </div>
+      )}
+
+      {/* Share Modal */}
+      {sceneId && (
+        <ShareModal
+          sceneId={sceneId}
+          sceneName={sceneName}
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 }
