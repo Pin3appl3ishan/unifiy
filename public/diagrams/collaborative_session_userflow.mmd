@@ -1,0 +1,151 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366f1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4f46e5', 'lineColor': '#94a3b8', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fef3c7'}}}%%
+flowchart TD
+    subgraph OwnerFlow["Scene Owner (Authenticated User)"]
+        A[/"Owner logged in<br/>at /workspace"/]
+        B["Select or create<br/>a scene"]
+        C["Navigate to<br/>/scene/:id"]
+        D["Work on scene<br/>(Excalidraw + CodePads)"]
+
+        subgraph OwnerStorage["Owner Data Flow"]
+            E["Changes saved to<br/>Zustand store"]
+            F["Debounced save<br/>(1000ms)"]
+            G[("Supabase Database<br/>scenes table<br/>- excalidraw_data<br/>- codepads<br/>- share_token<br/>- share_permission")]
+        end
+
+        subgraph ShareSetup["Share Configuration"]
+            H["Owner clicks<br/>Share button"]
+            I["ShareModal opens"]
+            J{Select<br/>Permission}
+            K["View Only"]
+            L["Can Edit"]
+            M["generateShareLink()<br/>creates UUID token"]
+            N["Token saved to<br/>share_token column"]
+            O["Share URL generated:<br/>/scene/:id/shared/:token"]
+            P["Owner copies & sends<br/>link to collaborator"]
+        end
+    end
+
+    subgraph CollaboratorFlow["Collaborator (Guest User)"]
+        Q[/"Collaborator receives<br/>share link"/]
+        R["Opens URL:<br/>/scene/:id/shared/:token"]
+
+        subgraph TokenValidation["Access Validation"]
+            S["SharedScene.tsx<br/>loads"]
+            T["validateShareToken()<br/>called"]
+            U{Token<br/>Valid?}
+            V["Access Denied<br/>Error shown"]
+            W["Scene loaded<br/>with permission"]
+        end
+
+        subgraph CollabActions["Collaborator Actions"]
+            X{Permission<br/>Level?}
+            Y["VIEW: Read-only<br/>canvas displayed"]
+            Z["EDIT: Full canvas<br/>access granted"]
+
+            subgraph ViewerExperience["View Mode"]
+                AA["Can see drawings"]
+                AB["Can see CodePads"]
+                AC["Cannot modify"]
+            end
+
+            subgraph EditorExperience["Edit Mode"]
+                AD["Can draw on canvas"]
+                AE["Can add/edit CodePads"]
+                AF["Changes save to<br/>Supabase"]
+            end
+        end
+
+        subgraph CollabStorage["Collaborator Storage"]
+            AG{Is Collaborator<br/>Logged In?}
+            AH["No localStorage<br/>needed - uses Supabase"]
+            AI["View via shared<br/>scene endpoint"]
+        end
+    end
+
+    subgraph RevokeFlow["Revoke Access"]
+        AJ["Owner clicks<br/>Revoke Share"]
+        AK["revokeShareLink()<br/>called"]
+        AL["share_token = null<br/>share_permission = 'none'"]
+        AM["Existing share links<br/>become invalid"]
+    end
+
+    subgraph LocalStorageNote["localStorage Note"]
+        AN[/"Note: localStorage is<br/>ONLY for anonymous<br/>solo users"/]
+        AO["Collaborative sessions<br/>ALWAYS use Supabase"]
+        AP["This ensures all<br/>participants see<br/>the same data"]
+    end
+
+    %% Owner Flow
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+
+    %% Share Setup
+    D --> H
+    H --> I
+    I --> J
+    J --> K
+    J --> L
+    K --> M
+    L --> M
+    M --> N
+    N --> O
+    O --> P
+
+    %% Collaborator Flow
+    P -.->|"sends link"| Q
+    Q --> R
+    R --> S
+    S --> T
+    T --> U
+    U -->|No| V
+    U -->|Yes| W
+
+    W --> X
+    X -->|View| Y
+    X -->|Edit| Z
+
+    Y --> AA
+    Y --> AB
+    Y --> AC
+
+    Z --> AD
+    Z --> AE
+    AE --> AF
+    AF --> G
+
+    W --> AG
+    AG -->|Yes| AH
+    AG -->|No| AI
+    AH --> G
+    AI --> G
+
+    %% Revoke Flow
+    G --> AJ
+    AJ --> AK
+    AK --> AL
+    AL --> AM
+    AM -.->|"invalidates"| U
+
+    %% Note connections
+    AN --- AO
+    AO --- AP
+
+    %% Styling
+    classDef storage fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef supabase fill:#dcfce7,stroke:#22c55e,stroke-width:2px,color:#166534
+    classDef action fill:#dbeafe,stroke:#3b82f6,stroke-width:1px,color:#1e40af
+    classDef decision fill:#f1f5f9,stroke:#64748b,stroke-width:1px,color:#334155
+    classDef entry fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
+    classDef error fill:#fee2e2,stroke:#ef4444,stroke-width:1px,color:#991b1b
+    classDef note fill:#e0e7ff,stroke:#6366f1,stroke-width:1px,color:#3730a3,stroke-dasharray: 5 5
+
+    class A,Q entry
+    class G supabase
+    class U,X,J,AG decision
+    class V error
+    class AN,AO,AP note
+    class D,H,M,AD,AE,AF action

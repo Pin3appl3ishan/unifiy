@@ -1,0 +1,16 @@
+flowchart TD
+    A[User visits U&I] --> B{Logged in?}
+
+    B -->|No| C[Open Canvas Instantly]
+    B -->|Yes| D[Redirect to Workspace]
+
+    C --> E[User draws & writes code]
+    E --> F[Work auto-saved locally]
+
+    F --> G[User closes tab]
+    G --> H[User returns later]
+    H --> I[Previous work restored]
+
+    E --> J[Optional: Sign up prompt]
+    J -->|Sign up| D
+    J -->|Skip| E

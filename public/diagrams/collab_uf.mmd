@@ -1,0 +1,16 @@
+flowchart TD
+    A["Owner opens workspace"] --> B["Clicks Share"]
+    B --> C["Selects permission<br/>View or Edit"]
+    C --> D["Share link generated"]
+    D --> E["Link sent to collaborator"]
+
+    E --> F["Collaborator opens link"]
+    F --> G{"Permission level?"}
+
+    G -->|View| H["Read-only access<br/>to canvas and code"]
+    G -->|Edit| I["Full editing access"]
+
+    I --> J["Both users see<br/>real-time updates"]
+
+    A --> K["Owner revokes access"]
+    K --> L["Shared link becomes invalid"]

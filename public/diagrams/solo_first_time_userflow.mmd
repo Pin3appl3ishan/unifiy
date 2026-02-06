@@ -1,0 +1,101 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366f1', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4f46e5', 'lineColor': '#94a3b8', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fef3c7'}}}%%
+flowchart TD
+    subgraph Entry["User Entry Point"]
+        A[/"First-Time User<br/>Visits U&I App"/]
+    end
+
+    subgraph AuthCheck["Authentication Check"]
+        B{Is User<br/>Logged In?}
+    end
+
+    subgraph AnonymousFlow["Anonymous User Flow"]
+        C["Route: / (Home)"]
+        D["Canvas.tsx loads<br/>with isAnonymous=true"]
+
+        subgraph LocalStorage["localStorage Persistence"]
+            E{Check localStorage<br/>for existing scene}
+            F["localSceneStore checks<br/>'unifii-local-scene' key"]
+            G["No existing scene found"]
+            H["createLocalScene()<br/>generates nanoid"]
+            I[("localStorage<br/>'unifii-local-scene'<br/>- id: nanoid<br/>- name: 'My Canvas'<br/>- excalidrawData: null<br/>- codePads: []")]
+        end
+
+        subgraph CanvasActions["Canvas Interactions"]
+            J["User draws on<br/>Excalidraw canvas"]
+            K["User adds CodePad<br/>components"]
+            L["addCodePad(x, y)<br/>creates new CodePad"]
+        end
+
+        subgraph AutoSave["Auto-Save to localStorage"]
+            M["Debounced save<br/>(500-1000ms)"]
+            N["saveExcalidrawData()<br/>updates localStorage"]
+            O["updateCodePad()<br/>updates localStorage"]
+            P[("localStorage Updated<br/>- excalidrawData: {...}<br/>- codePads: [{...}]<br/>- updatedAt: timestamp")]
+        end
+
+        subgraph ReturnVisit["Return Visit"]
+            Q["User returns later"]
+            R["localSceneStore<br/>hydrates from localStorage"]
+            S["Previous work<br/>automatically restored"]
+        end
+
+        subgraph SignupPrompt["Sign Up Prompt"]
+            T["Banner shown:<br/>'Your work is saved locally'"]
+            U{User clicks<br/>Sign Up?}
+            V["Navigate to /signup"]
+            W["Continue working<br/>anonymously"]
+        end
+    end
+
+    subgraph AuthenticatedRedirect["Authenticated User"]
+        X["Redirect to /workspace"]
+    end
+
+    %% Flow connections
+    A --> B
+    B -->|No| C
+    B -->|Yes| X
+
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+
+    I --> J
+    I --> K
+    K --> L
+    L --> I
+
+    J --> M
+    M --> N
+    N --> P
+
+    K --> M
+    L --> O
+    O --> P
+
+    P --> T
+    T --> U
+    U -->|Yes| V
+    U -->|No| W
+    W --> J
+
+    Q --> R
+    R --> P
+    P --> S
+    S --> J
+
+    %% Styling
+    classDef storage fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef action fill:#dbeafe,stroke:#3b82f6,stroke-width:1px,color:#1e40af
+    classDef decision fill:#f1f5f9,stroke:#64748b,stroke-width:1px,color:#334155
+    classDef entry fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
+    classDef highlight fill:#dcfce7,stroke:#22c55e,stroke-width:2px,color:#166534
+
+    class A entry
+    class I,P storage
+    class B,E,U decision
+    class J,K,L,M,N,O action
+    class S,R highlight
