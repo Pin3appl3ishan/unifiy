@@ -13,6 +13,7 @@
     "@excalidraw/excalidraw": "^0.18.0",
     "@supabase/supabase-js": "^2.89.0",
     "browser-fs-access": "0.29.1",
+    "framer-motion": "^12.29.2",
     "lucide-react": "^0.562.0",
     "nanoid": "^5.0.8",
     "react": "19.0.0",
