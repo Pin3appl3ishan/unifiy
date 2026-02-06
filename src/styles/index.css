@@ -53,6 +53,34 @@ body {
   height: 100%;
 }
 
+/* CodePad toolbar button - matches Excalidraw native ToolIcon styling */
+.codepad-toolbar-btn {
+  width: var(--lg-button-size, 2.25rem);
+  height: var(--lg-button-size, 2.25rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  cursor: pointer;
+  color: var(--icon-fill-color);
+  background: transparent;
+  border: none;
+  transition: background 0.1s ease;
+}
+
+.codepad-toolbar-btn:hover:not(:disabled) {
+  background: var(--button-hover-bg, rgba(0, 0, 0, 0.05));
+}
+
+.codepad-toolbar-btn:active:not(:disabled) {
+  background: var(--button-hover-bg, rgba(0, 0, 0, 0.1));
+}
+
+.codepad-toolbar-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* ===== CodePad Styles ===== */
 .codepad {
   position: absolute;
