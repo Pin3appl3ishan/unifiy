@@ -8,6 +8,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Canvas from "./pages/Canvas";
 import SharedScene from "./pages/SharedScene";
+import Landing from "./pages/Landing";
 
 // Root route: logged-in → dashboard, anonymous → canvas
 function RootRoute() {
@@ -100,6 +101,7 @@ export default function App() {
       <Route path="/" element={<RootRoute />} />
 
       {/* Public routes */}
+      <Route path="/landing" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
 
