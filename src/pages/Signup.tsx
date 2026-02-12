@@ -35,7 +35,7 @@ export default function Signup() {
     const { error } = await signUp(email, password);
 
     if (!error) {
-      navigate('/');
+      navigate('/onboarding');
     }
   };
 
