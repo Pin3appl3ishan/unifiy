@@ -1,14 +1,23 @@
-# U&I — Ideate. Code. Create.
+<p align="center">
+  <img src="/public/images/uni_cover.png" alt="U&I Cover Page" width="780" />
+</p>
 
-A collaborative whiteboard application built on [Excalidraw](https://excalidraw.com/) with integrated code editing capabilities. Sketch ideas, write code, and organize your creative workflow — all on one infinite canvas.
+[![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-purple?logo=vite)](https://vite.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase)](https://supabase.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-blue?logo=tailwindcss)](https://tailwindcss.com/)
+[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel)](https://unifii.vercel.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![React](https://img.shields.io/badge/React-19-blue?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-5-purple?logo=vite)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-blue?logo=tailwindcss)
 
----
+<div>
+ <h3 align="center">U&I - Ideate. Code. Create</h3>
+
+> A collaborative whiteboard application live on [unifii.vercel.app](https://unifiy.vercel.app) with integrated code editing capabilities. Sketch ideas, write code, and organize your creative workflow - all on one infinite canvas.
+</div>
+
+> **Live Demo** - [unifii.vercel.app](https://unifiy.vercel.app)
 
 ## Table of Contents
 
@@ -32,21 +41,22 @@ A collaborative whiteboard application built on [Excalidraw](https://excalidraw.
 ### Canvas & Drawing
 - Infinite whiteboard powered by Excalidraw
 - Dark and light mode support
-- Auto-save with debounced writes (500ms)
+- Auto-save with debounced writes
 - Scene renaming (double-click the title)
 
-### CodePad — Code on the Canvas
+### CodePad - Code on the Canvas
 - Embedded code editor widgets powered by CodeMirror 6
+- **Multi-language support** - JavaScript, Python, HTML, CSS, JSON, Java, Markdown
 - Draggable and resizable editor windows
-- Syntax highlighting (JavaScript)
 - Minimize, maximize, and close controls
+- Copy-to-clipboard for code snippets
 - Tier-based limits: Free users get up to 3 CodePads per scene
 
 ### Authentication & User Management
-- Anonymous mode — start drawing immediately, data saved to localStorage
+- Anonymous mode - start drawing immediately, data saved to localStorage
 - Email/password authentication via Supabase Auth
 - Automatic data migration from localStorage to your account on sign-up
-- Onboarding flow for new users
+- Guided onboarding flow for new users
 
 ### Workspaces & Scenes
 - Organize scenes into workspaces
@@ -56,7 +66,7 @@ A collaborative whiteboard application built on [Excalidraw](https://excalidraw.
 
 ### Sharing
 - Generate view-only share links with secure UUID tokens
-- Public access to shared scenes — no login required
+- Public access to shared scenes - no login required
 - Revoke share links at any time
 - Copy-to-clipboard share URLs
 
@@ -81,6 +91,8 @@ A collaborative whiteboard application built on [Excalidraw](https://excalidraw.
 | **Animations** | Framer Motion |
 | **Routing** | React Router 7 |
 | **Icons** | Lucide React |
+| **Toasts** | Sonner |
+| **Deployment** | Vercel |
 
 ---
 
@@ -88,31 +100,48 @@ A collaborative whiteboard application built on [Excalidraw](https://excalidraw.
 
 U&I uses a **dual-mode architecture** to support both anonymous and authenticated users:
 
-```
-┌─────────────────────────────────────────────────┐
-│                   React App                      │
-│                                                  │
-│  ┌──────────────┐       ┌──────────────────┐    │
-│  │  Anonymous    │       │  Authenticated    │    │
-│  │  User Flow    │       │  User Flow        │    │
-│  │              │       │                    │    │
-│  │ localStorage  │──────▶│  Supabase         │    │
-│  │ (localScene   │ migrate│ (sceneStore +     │    │
-│  │   Store)      │ on     │  workspaceStore)  │    │
-│  │              │ signup │                    │    │
-│  └──────────────┘       └──────────────────┘    │
-│                                                  │
-│  ┌──────────────────────────────────────────┐   │
-│  │           Whiteboard Component            │   │
-│  │  ┌────────────┐  ┌─────────────────┐     │   │
-│  │  │ Excalidraw  │  │ CodePad Overlays │     │   │
-│  │  │ (Canvas)    │  │ (CodeMirror 6)   │     │   │
-│  │  └────────────┘  └─────────────────┘     │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph App["React Application"]
+        direction TB
+
+        subgraph Anonymous["Anonymous User Flow"]
+            LS["localSceneStore
+            (Zustand + persist)"]
+            LOCAL[("localStorage")]
+            LS <--> LOCAL
+        end
+
+        subgraph Authenticated["Authenticated User Flow"]
+            SS["sceneStore"]
+            WS["workspaceStore"]
+            AS["authStore"]
+        end
+
+        subgraph Canvas["Whiteboard Component"]
+            EX["Excalidraw
+            (Canvas)"]
+            CP["CodePad Overlays
+            (CodeMirror 6)"]
+        end
+
+        Anonymous -- "migrate on
+        sign-up" --> Authenticated
+        Canvas --> Anonymous
+        Canvas --> Authenticated
+    end
+
+    Authenticated <-- "REST API\n(Auth + CRUD)" --> SB
+
+    subgraph SB["Supabase"]
+        AUTH["Auth
+        (JWT sessions)"]
+        DB[("PostgreSQL + RLS")]
+        AUTH --- DB
+    end
 ```
 
-**Anonymous users** can start drawing immediately. All data persists in the browser's localStorage via `localSceneStore`. When a user signs up, the onboarding flow automatically migrates their local work into Supabase.
+**Anonymous users** start drawing immediately. All data persists in the browser via `localSceneStore` (Zustand with persist middleware). When a user signs up, the onboarding flow automatically migrates their local work into Supabase.
 
 **Authenticated users** get full access to workspaces, multiple scenes, sharing, and cloud persistence through `sceneStore` and `workspaceStore`, both backed by Supabase with Row Level Security.
 
@@ -122,23 +151,21 @@ U&I uses a **dual-mode architecture** to support both anonymous and authenticate
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later recommended)
-- npm or yarn
+- [Node.js](https://nodejs.org/) v18+
+- npm
 - A [Supabase](https://supabase.com/) project (for authentication and cloud storage)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/unifii.git
-cd unifii
+git clone https://github.com/Pin3appl3ishan/unifiy.git
+cd unifiy
 
 # Install dependencies
 npm install
 
-# Set up environment variables (see section below)
-cp .env.example .env
-# Edit .env with your Supabase credentials
+# Create a .env file with your Supabase credentials (see Environment Variables below)
 
 # Start the development server
 npm run dev
@@ -168,11 +195,18 @@ src/
 │   ├── ShareModal/
 │   │   └── ShareModal.tsx           # Share link generation and management
 │   ├── Whiteboard/
-│   │   └── Whiteboard.tsx           # Excalidraw + CodePad integration
+│   │   └── Whiteboard.tsx           # Excalidraw + CodePad integration + auto-save
 │   ├── Workspace/
 │   │   └── CreateWorkspaceModal.tsx # Workspace creation form
 │   ├── WorkspaceSwitcher/
 │   │   └── WorkspaceSwitcher.tsx    # Workspace dropdown selector
+│   ├── ui/
+│   │   ├── Skeleton.tsx             # Skeleton + Skeleton.Text + Skeleton.Circle
+│   │   ├── Spinner.tsx              # Spinner + PageSpinner
+│   │   ├── DashboardSkeleton.tsx    # Dashboard loading skeleton
+│   │   └── CanvasSkeleton.tsx       # Canvas loading skeleton
+│   ├── ErrorBoundary.tsx            # React error boundary (class component)
+│   ├── ErrorFallback.tsx            # Reusable error display with retry
 │   ├── ProtectedRoute.tsx           # Auth guard for protected routes
 │   └── index.ts                     # Barrel export
 ├── pages/
@@ -183,23 +217,29 @@ src/
 │   ├── Signup.tsx                   # Registration page
 │   └── SharedScene.tsx              # Public shared scene viewer
 ├── stores/
-│   ├── authStore.ts                 # Authentication + user profiles
-│   ├── localSceneStore.ts           # Anonymous user data (localStorage)
-│   ├── sceneStore.ts                # Remote scene CRUD (Supabase)
+│   ├── authStore.ts                 # Authentication + user profiles + onboarding
+│   ├── localSceneStore.ts           # Anonymous user data (localStorage via persist)
+│   ├── sceneStore.ts                # Remote scene CRUD + sharing (Supabase)
 │   └── workspaceStore.ts            # Workspace management
 ├── lib/
-│   └── supabase.ts                  # Supabase client init
+│   ├── supabase.ts                  # Supabase client configuration
+│   ├── errors.ts                    # Custom error classes (AppError, AuthError, NetworkError, etc.)
+│   └── logger.ts                    # Structured error logging utility
+├── types/
+│   └── index.ts                     # Centralized shared interfaces and types
+├── constants/
+│   └── index.ts                     # Magic numbers, strings, toast messages, limits
 ├── styles/
 │   └── index.css                    # Tailwind + custom styles
-├── App.tsx                          # Route configuration
-└── main.tsx                         # Entry point
+├── App.tsx                          # Route configuration + lazy loading
+└── main.tsx                         # Entry point + ErrorBoundary + Toaster
 ```
 
 ---
 
 ## Environment Variables
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -212,37 +252,40 @@ You can find these values in your [Supabase project settings](https://app.supaba
 
 ## Database Schema
 
-The application uses three tables in Supabase with Row Level Security enabled:
+The application uses three core tables in Supabase with Row Level Security enabled:
 
-### `profiles`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | References `auth.users.id` |
-| `tier` | text | `free` or `premium` |
-| `current_workspace_id` | UUID | Active workspace |
-| `onboarding_complete` | boolean | Whether onboarding has been completed |
+```mermaid
+erDiagram
+    profiles ||--o{ workspaces : "owns"
+    workspaces ||--o{ scenes : "contains"
 
-### `workspaces`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | Workspace identifier |
-| `owner_id` | UUID (FK) | References `profiles.id` |
-| `name` | text | Workspace name |
-| `created_at` | timestamptz | Creation timestamp |
-| `updated_at` | timestamptz | Last update timestamp |
+    profiles {
+        uuid id PK "references auth.users.id"
+        text tier "free | premium"
+        uuid current_workspace_id FK
+        boolean onboarding_complete
+    }
 
-### `scenes`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | Scene identifier |
-| `workspace_id` | UUID (FK) | References `workspaces.id` |
-| `name` | text | Scene name |
-| `excalidraw_data` | jsonb | Excalidraw canvas state |
-| `codepads` | jsonb | Array of CodePad objects |
-| `share_token` | UUID | Nullable; token for share links |
-| `share_permission` | text | `none`, `view`, or `edit` |
-| `created_at` | timestamptz | Creation timestamp |
-| `updated_at` | timestamptz | Last update timestamp |
+    workspaces {
+        uuid id PK
+        uuid owner_id FK "references profiles.id"
+        text name
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    scenes {
+        uuid id PK
+        uuid workspace_id FK "references workspaces.id"
+        text name
+        jsonb excalidraw_data "Excalidraw canvas state"
+        jsonb codepads "Array of CodePad objects"
+        uuid share_token "nullable — for share links"
+        text share_permission "none | view | edit"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+```
 
 ---
 
@@ -266,7 +309,7 @@ The application uses three tables in Supabase with Row Level Security enabled:
 |----------|--------|
 | `Ctrl/Cmd + Shift + C` | Add a new CodePad to the canvas |
 
-All standard Excalidraw shortcuts are also available on the canvas.
+All standard Excalidraw keyboard shortcuts are also available on the canvas.
 
 ---
 
@@ -291,4 +334,6 @@ npm run lint      # Run TypeScript type checking (tsc --noEmit)
 
 ---
 
+## License
 
+This project is licensed under the [MIT License](LICENSE).
