@@ -90,10 +90,10 @@ body {
   overflow: hidden;
   min-width: 300px;
   min-height: 200px;
-  z-index: 100;
+  z-index: 3;
 }
 
-.dark .codepad {
+.codepad.dark {
   background: #1e293b;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
@@ -102,7 +102,7 @@ body {
   @apply flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200;
 }
 
-.dark .codepad-header {
+.codepad.dark .codepad-header {
   @apply bg-slate-800 border-slate-700;
 }
 

@@ -94,7 +94,7 @@ export default function ShareModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[200]">
       <div className={`rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden ${isDarkMode ? "bg-slate-800" : "bg-white"}`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? "border-slate-700" : "border-slate-200"}`}>
