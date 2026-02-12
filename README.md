@@ -1,20 +1,22 @@
 <p align="center">
-  <img src="/public/images/uni_cover.png" alt="U&I Cover Page" width="780" />
+  <img src="/public/images/uni_cover.png" alt="U&I Cover Page" width="800" />
 </p>
 
-[![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-purple?logo=vite)](https://vite.dev/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase)](https://supabase.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-blue?logo=tailwindcss)](https://tailwindcss.com/)
-[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel)](https://unifii.vercel.app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
+<p align="center">
+    <img src="https://img.shields.io/badge/React-19-blue?logo=react" alt="React" />
+    <img src="https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Vite-5-purple?logo=vite" alt="Vite" />
+    <img src="https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase" alt="Supabase" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-blue?logo=tailwindcss" alt="Tailwind CSS" />
+    <img src="https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel" alt="Vercel Deployment" />
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License" />
+</p>
 
 <div>
  <h3 align="center">U&I - Ideate. Code. Create</h3>
 
 > A collaborative whiteboard application live on [unifii.vercel.app](https://unifiy.vercel.app) with integrated code editing capabilities. Sketch ideas, write code, and organize your creative workflow - all on one infinite canvas.
+
 </div>
 
 > **Live Demo** - [unifii.vercel.app](https://unifiy.vercel.app)
@@ -39,12 +41,14 @@
 ## Features
 
 ### Canvas & Drawing
+
 - Infinite whiteboard powered by Excalidraw
 - Dark and light mode support
 - Auto-save with debounced writes
 - Scene renaming (double-click the title)
 
 ### CodePad - Code on the Canvas
+
 - Embedded code editor widgets powered by CodeMirror 6
 - **Multi-language support** - JavaScript, Python, HTML, CSS, JSON, Java, Markdown
 - Draggable and resizable editor windows
@@ -53,24 +57,28 @@
 - Tier-based limits: Free users get up to 3 CodePads per scene
 
 ### Authentication & User Management
+
 - Anonymous mode - start drawing immediately, data saved to localStorage
 - Email/password authentication via Supabase Auth
 - Automatic data migration from localStorage to your account on sign-up
 - Guided onboarding flow for new users
 
 ### Workspaces & Scenes
+
 - Organize scenes into workspaces
 - Create, rename, and delete scenes from the dashboard
 - Switch between workspaces with the workspace switcher
 - Tier-based workspace limits (Free: 1 workspace, Premium: unlimited)
 
 ### Sharing
+
 - Generate view-only share links with secure UUID tokens
 - Public access to shared scenes - no login required
 - Revoke share links at any time
 - Copy-to-clipboard share URLs
 
 ### Landing Page
+
 - Animated marketing page with Framer Motion
 - Hero section, feature highlights, integration showcase, and bento grid layout
 - Responsive design across all breakpoints
@@ -79,20 +87,20 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Framework** | React 19 + TypeScript |
-| **Build Tool** | Vite 5 |
-| **Canvas** | Excalidraw 0.18 |
-| **Code Editor** | CodeMirror 6 |
-| **State Management** | Zustand 5 (with persist middleware) |
-| **Backend / Auth** | Supabase (PostgreSQL + Auth + Row Level Security) |
-| **Styling** | Tailwind CSS 3.4 |
-| **Animations** | Framer Motion |
-| **Routing** | React Router 7 |
-| **Icons** | Lucide React |
-| **Toasts** | Sonner |
-| **Deployment** | Vercel |
+| Layer                | Technology                                        |
+| -------------------- | ------------------------------------------------- |
+| **Framework**        | React 19 + TypeScript                             |
+| **Build Tool**       | Vite 5                                            |
+| **Canvas**           | Excalidraw 0.18                                   |
+| **Code Editor**      | CodeMirror 6                                      |
+| **State Management** | Zustand 5 (with persist middleware)               |
+| **Backend / Auth**   | Supabase (PostgreSQL + Auth + Row Level Security) |
+| **Styling**          | Tailwind CSS 3.4                                  |
+| **Animations**       | Framer Motion                                     |
+| **Routing**          | React Router 7                                    |
+| **Icons**            | Lucide React                                      |
+| **Toasts**           | Sonner                                            |
+| **Deployment**       | Vercel                                            |
 
 ---
 
@@ -131,7 +139,8 @@ flowchart TD
         Canvas --> Authenticated
     end
 
-    Authenticated <-- "REST API\n(Auth + CRUD)" --> SB
+    Authenticated <-- "REST API
+    (Auth + CRUD)" --> SB
 
     subgraph SB["Supabase"]
         AUTH["Auth
@@ -291,22 +300,22 @@ erDiagram
 
 ## Routes
 
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/` | No | Anonymous canvas (redirects to `/workspace` if logged in) |
-| `/landing` | No | Marketing landing page |
-| `/login` | No | Login page |
-| `/signup` | No | Registration page |
-| `/scene/:sceneId/shared/:token` | No | Public shared scene (view-only) |
-| `/workspace` | Yes | Dashboard — manage scenes and workspaces |
-| `/scene/:id` | Yes | Scene editor (authenticated) |
+| Route                           | Auth | Description                                               |
+| ------------------------------- | ---- | --------------------------------------------------------- |
+| `/`                             | No   | Anonymous canvas (redirects to `/workspace` if logged in) |
+| `/landing`                      | No   | Marketing landing page                                    |
+| `/login`                        | No   | Login page                                                |
+| `/signup`                       | No   | Registration page                                         |
+| `/scene/:sceneId/shared/:token` | No   | Public shared scene (view-only)                           |
+| `/workspace`                    | Yes  | Dashboard — manage scenes and workspaces                  |
+| `/scene/:id`                    | Yes  | Scene editor (authenticated)                              |
 
 ---
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut               | Action                          |
+| ---------------------- | ------------------------------- |
 | `Ctrl/Cmd + Shift + C` | Add a new CodePad to the canvas |
 
 All standard Excalidraw keyboard shortcuts are also available on the canvas.
