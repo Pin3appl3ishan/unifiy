@@ -1,28 +1,23 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingModal from "./components/Onboarding/OnboardingModal";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
-import Canvas from "./pages/Canvas";
-import SharedScene from "./pages/SharedScene";
-import Landing from "./pages/Landing";
+import { PageSpinner } from "./components/ui/Spinner";
+
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Canvas = lazy(() => import("./pages/Canvas"));
+const SharedScene = lazy(() => import("./pages/SharedScene"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 // Root route: logged-in → dashboard, anonymous → canvas
 function RootRoute() {
   const { user, loading } = useAuthStore();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary-500 mb-2">U&I</h1>
-          <p className="text-slate-500">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageSpinner label="Loading..." />;
   }
 
   // Logged-in users go to dashboard/workspace
@@ -52,14 +47,7 @@ function AuthenticatedRoutes() {
   // If we already have a profile, keep showing the app (even if refreshing in background)
   // This prevents the "Loading profile" flash on tab switches
   if (!profile && profileLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary-500 mb-2">U&I</h1>
-          <p className="text-slate-500">Loading your profile...</p>
-        </div>
-      </div>
-    );
+    return <PageSpinner label="Loading your profile..." />;
   }
 
   // Show onboarding modal if needed
@@ -85,46 +73,41 @@ export default function App() {
 
   // Show loading state while initializing auth
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary-500 mb-2">U&I</h1>
-          <p className="text-slate-500">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageSpinner label="Loading..." />;
   }
 
   return (
-    <Routes>
-      {/* Root: anonymous canvas or redirect to workspace */}
-      <Route path="/" element={<RootRoute />} />
+    <Suspense fallback={<PageSpinner label="Loading..." />}>
+      <Routes>
+        {/* Root: anonymous canvas or redirect to workspace */}
+        <Route path="/" element={<RootRoute />} />
 
-      {/* Public routes */}
-      <Route path="/landing" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+        {/* Public routes */}
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
-      {/* Shared scene - public access via share token */}
-      <Route path="/scene/:sceneId/shared/:token" element={<SharedScene />} />
+        {/* Shared scene - public access via share token */}
+        <Route path="/scene/:sceneId/shared/:token" element={<SharedScene />} />
 
-      {/* Protected routes - wrapped with onboarding check */}
-      <Route element={<ProtectedRoute><AuthenticatedRoutes /></ProtectedRoute>}>
-        <Route path="/workspace" element={<Dashboard />} />
-        <Route path="/scene/:id" element={<Canvas />} />
-      </Route>
-      <Route
-        path="/dashboard"
-        element={<Navigate to="/workspace" replace />}
-      />
-      {/* Legacy route redirect */}
-      <Route
-        path="/canvas/:id"
-        element={<Navigate to="/workspace" replace />}
-      />
+        {/* Protected routes - wrapped with onboarding check */}
+        <Route element={<ProtectedRoute><AuthenticatedRoutes /></ProtectedRoute>}>
+          <Route path="/workspace" element={<Dashboard />} />
+          <Route path="/scene/:id" element={<Canvas />} />
+        </Route>
+        <Route
+          path="/dashboard"
+          element={<Navigate to="/workspace" replace />}
+        />
+        {/* Legacy route redirect */}
+        <Route
+          path="/canvas/:id"
+          element={<Navigate to="/workspace" replace />}
+        />
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

@@ -21,6 +21,7 @@ interface SceneState {
   scenes: Scene[];
   currentScene: Scene | null;
   isLoading: boolean;
+  isInitialLoad: boolean;
   isSaving: boolean;
   error: string | null;
 
@@ -89,6 +90,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   scenes: [],
   currentScene: null,
   isLoading: false,
+  isInitialLoad: true,
   isSaving: false,
   error: null,
 
@@ -110,7 +112,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       if (error) throw error;
 
       const scenes = (data || []).map(toScene);
-      set({ scenes, isLoading: false });
+      set({ scenes, isLoading: false, isInitialLoad: false });
     } catch (error: unknown) {
       logError(error, { source: "SceneStore", action: "fetchScenes" });
       set({
@@ -495,6 +497,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       scenes: [],
       currentScene: null,
       isLoading: false,
+      isInitialLoad: true,
       isSaving: false,
       error: null,
     });

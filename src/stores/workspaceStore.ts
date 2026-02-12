@@ -13,6 +13,7 @@ interface WorkspaceState {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
   isLoading: boolean;
+  isInitialLoad: boolean;
   error: string | null;
 
   // Actions
@@ -45,6 +46,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   currentWorkspace: null,
   isLoading: false,
+  isInitialLoad: true,
   error: null,
 
   /**
@@ -72,6 +74,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({
         workspaces,
         isLoading: false,
+        isInitialLoad: false,
       });
 
       // Auto-select first workspace if none selected
@@ -220,6 +223,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     workspaces: [],
     currentWorkspace: null,
     isLoading: false,
+    isInitialLoad: true,
     error: null,
   }),
 

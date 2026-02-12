@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Loader2, AlertCircle, Eye, UserPlus } from "lucide-react";
+import { AlertCircle, Eye, UserPlus } from "lucide-react";
 import { useSceneStore, Scene } from "../stores/sceneStore";
 import { logError } from "../lib/logger";
+import { PageSpinner } from "../components/ui/Spinner";
 import Whiteboard from "../components/Whiteboard/Whiteboard";
 
 export default function SharedScene() {
@@ -44,14 +45,7 @@ export default function SharedScene() {
 
   // Loading state
   if (isValidating) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Validating share link...</p>
-        </div>
-      </div>
-    );
+    return <PageSpinner label="Validating share link..." />;
   }
 
   // Error state

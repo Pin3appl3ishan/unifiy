@@ -7,6 +7,7 @@ import { useSceneStore } from "../stores/sceneStore";
 import { DEFAULT_SCENE_NAME, MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from "../constants";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher/WorkspaceSwitcher";
 import CreateWorkspaceModal from "../components/Workspace/CreateWorkspaceModal";
+import DashboardSkeleton from "../components/ui/DashboardSkeleton";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,9 +21,17 @@ export default function Dashboard() {
     setCurrentWorkspace,
     canCreateWorkspace,
     isLoading: workspaceLoading,
+    isInitialLoad: workspaceInitialLoad,
     error: workspaceError,
   } = useWorkspaceStore();
-  const { scenes, fetchScenes, createScene, isLoading: sceneLoading, error: sceneError } = useSceneStore();
+  const {
+    scenes,
+    fetchScenes,
+    createScene,
+    isLoading: sceneLoading,
+    isInitialLoad: sceneInitialLoad,
+    error: sceneError,
+  } = useSceneStore();
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -79,6 +88,12 @@ export default function Dashboard() {
   };
 
   const isLoading = workspaceLoading || sceneLoading;
+  const isInitialLoad = workspaceInitialLoad || sceneInitialLoad;
+
+  // Show skeleton on initial load
+  if (isLoading && isInitialLoad) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -136,14 +151,7 @@ export default function Dashboard() {
         </div>
 
         {/* Scene grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-500">Loading your scenes...</p>
-            </div>
-          </div>
-        ) : (sceneError || workspaceError) && scenes.length === 0 ? (
+        {(sceneError || workspaceError) && scenes.length === 0 ? (
           <div className="text-center py-12">
             <AlertCircle size={48} className="text-red-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-700 mb-2">Failed to load</h3>

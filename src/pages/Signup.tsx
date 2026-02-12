@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Code2, PenTool, Layers, Sparkles, Zap, Brain, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { Spinner } from '../components/ui/Spinner';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -390,7 +391,7 @@ export default function Signup() {
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
             >
               {loading ? (
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Spinner size="sm" className="[&_div]:border-white/30 [&_div]:border-t-white" />
               ) : (
                 <>
                   Create Account <ArrowRight className="w-4 h-4" />

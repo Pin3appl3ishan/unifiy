@@ -4,6 +4,7 @@ import { ArrowLeft, Cloud, X } from "lucide-react";
 import { useLocalSceneStore } from "../stores/localSceneStore";
 import { useSceneStore } from "../stores/sceneStore";
 import Whiteboard from "../components/Whiteboard/Whiteboard";
+import CanvasSkeleton from "../components/ui/CanvasSkeleton";
 
 interface CanvasProps {
   isAnonymous?: boolean;
@@ -37,14 +38,7 @@ export default function Canvas({ isAnonymous = false }: CanvasProps) {
 
   // Show loading state for remote scenes
   if (!isAnonymous && isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">Loading your scene...</p>
-        </div>
-      </div>
-    );
+    return <CanvasSkeleton />;
   }
 
   // Scene not found (logged-in users)
@@ -72,14 +66,7 @@ export default function Canvas({ isAnonymous = false }: CanvasProps) {
 
   // Anonymous: waiting for scene to be created
   if (isAnonymous && !localScene) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">Setting up your canvas...</p>
-        </div>
-      </div>
-    );
+    return <CanvasSkeleton />;
   }
 
   return (
