@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, FileText, Clock, ArrowRight, Lock, Plus } from "lucide-react";
+import { LogOut, FileText, Clock, ArrowRight, Lock, Plus, AlertCircle, RefreshCw } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useSceneStore } from "../stores/sceneStore";
@@ -20,8 +20,9 @@ export default function Dashboard() {
     setCurrentWorkspace,
     canCreateWorkspace,
     isLoading: workspaceLoading,
+    error: workspaceError,
   } = useWorkspaceStore();
-  const { scenes, fetchScenes, createScene, isLoading: sceneLoading } = useSceneStore();
+  const { scenes, fetchScenes, createScene, isLoading: sceneLoading, error: sceneError } = useSceneStore();
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -141,6 +142,22 @@ export default function Dashboard() {
               <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-slate-500">Loading your scenes...</p>
             </div>
+          </div>
+        ) : (sceneError || workspaceError) && scenes.length === 0 ? (
+          <div className="text-center py-12">
+            <AlertCircle size={48} className="text-red-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-700 mb-2">Failed to load</h3>
+            <p className="text-slate-500 mb-4">{sceneError || workspaceError}</p>
+            <button
+              onClick={() => {
+                if (currentWorkspace) fetchScenes(currentWorkspace.id);
+                else fetchWorkspaces();
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+            >
+              <RefreshCw size={18} />
+              Retry
+            </button>
           </div>
         ) : scenes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

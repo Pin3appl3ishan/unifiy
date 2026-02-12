@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Loader2, AlertCircle, Eye, UserPlus } from "lucide-react";
 import { useSceneStore, Scene } from "../stores/sceneStore";
+import { logError } from "../lib/logger";
 import Whiteboard from "../components/Whiteboard/Whiteboard";
 
 export default function SharedScene() {
@@ -31,7 +32,7 @@ export default function SharedScene() {
           setError("This share link is invalid or has been revoked");
         }
       } catch (err) {
-        console.error("[SharedScene] Validation error:", err);
+        logError(err, { source: "SharedScene", action: "validateShareToken" });
         setError("Failed to validate share link");
       } finally {
         setIsValidating(false);

@@ -1,8 +1,10 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
+import { logError } from "../lib/logger";
 import type { Workspace, SupabaseWorkspace, UserTier } from "../types";
 import { getErrorMessage } from "../types";
-import { MAX_WORKSPACES_FREE } from "../constants";
+import { MAX_WORKSPACES_FREE, TOAST_MESSAGES } from "../constants";
 
 // Re-export types for backward compatibility
 export type { Workspace } from "../types";
@@ -77,11 +79,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         set({ currentWorkspace: workspaces[0] });
       }
     } catch (error: unknown) {
-      console.error("[WorkspaceStore] fetchWorkspaces error:", error);
+      logError(error, { source: "WorkspaceStore", action: "fetchWorkspaces" });
       set({
         isLoading: false,
         error: getErrorMessage(error),
       });
+      toast.error(TOAST_MESSAGES.WORKSPACE_FETCH_FAILED);
     }
   },
 
@@ -118,11 +121,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       return workspace;
     } catch (error: unknown) {
-      console.error("[WorkspaceStore] createWorkspace error:", error);
+      logError(error, { source: "WorkspaceStore", action: "createWorkspace" });
       set({
         isLoading: false,
         error: getErrorMessage(error),
       });
+      toast.error(TOAST_MESSAGES.WORKSPACE_CREATE_FAILED);
       return null;
     }
   },
@@ -167,8 +171,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             : state.currentWorkspace,
       }));
     } catch (error: unknown) {
-      console.error("[WorkspaceStore] updateWorkspace error:", error);
+      logError(error, { source: "WorkspaceStore", action: "updateWorkspace" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.WORKSPACE_UPDATE_FAILED);
     }
   },
 
@@ -199,8 +204,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
       });
     } catch (error: unknown) {
-      console.error("[WorkspaceStore] deleteWorkspace error:", error);
+      logError(error, { source: "WorkspaceStore", action: "deleteWorkspace" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.WORKSPACE_DELETE_FAILED);
     }
   },
 

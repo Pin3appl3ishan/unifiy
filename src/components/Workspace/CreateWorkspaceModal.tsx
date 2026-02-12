@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useWorkspaceStore, Workspace } from "../../stores/workspaceStore";
+import { logError } from "../../lib/logger";
 
 interface CreateWorkspaceModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export default function CreateWorkspaceModal({
       setWorkspaceName("");
       onCreated(workspace);
     } catch (err: unknown) {
-      console.error("[CreateWorkspaceModal] Error:", err);
+      logError(err, { source: "CreateWorkspaceModal", action: "createWorkspace" });
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setIsCreating(false);

@@ -1,5 +1,7 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
+import { logError } from "../lib/logger";
 import type {
   CodePad,
   Scene,
@@ -10,7 +12,7 @@ import type {
   SharePermission,
 } from "../types";
 import { getErrorMessage } from "../types";
-import { SAVE_DEBOUNCE_MS, DEFAULT_SCENE_NAME } from "../constants";
+import { SAVE_DEBOUNCE_MS, DEFAULT_SCENE_NAME, TOAST_MESSAGES } from "../constants";
 
 // Re-export types for backward compatibility
 export type { Scene } from "../types";
@@ -60,7 +62,7 @@ const toScene = (row: SupabaseScene): Scene => {
       try {
         codePads = JSON.parse(row.codepads);
       } catch (e) {
-        console.error("[SceneStore] Failed to parse codepads:", e);
+        logError(e, { source: "SceneStore", action: "parseCodepads" });
       }
     } else if (Array.isArray(row.codepads)) {
       codePads = row.codepads;
@@ -110,11 +112,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const scenes = (data || []).map(toScene);
       set({ scenes, isLoading: false });
     } catch (error: unknown) {
-      console.error("[SceneStore] fetchScenes error:", error);
+      logError(error, { source: "SceneStore", action: "fetchScenes" });
       set({
         isLoading: false,
         error: getErrorMessage(error),
       });
+      toast.error(TOAST_MESSAGES.SCENE_FETCH_FAILED);
     }
   },
 
@@ -147,11 +150,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       return scene;
     } catch (error: unknown) {
-      console.error("[SceneStore] fetchScene error:", error);
+      logError(error, { source: "SceneStore", action: "fetchScene" });
       set({
         isLoading: false,
         error: getErrorMessage(error),
       });
+      toast.error(TOAST_MESSAGES.SCENE_FETCH_FAILED);
       return null;
     }
   },
@@ -191,11 +195,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       return scene;
     } catch (error: unknown) {
-      console.error("[SceneStore] createScene error:", error);
+      logError(error, { source: "SceneStore", action: "createScene" });
       set({
         isLoading: false,
         error: getErrorMessage(error),
       });
+      toast.error(TOAST_MESSAGES.SCENE_CREATE_FAILED);
       return null;
     }
   },
@@ -234,8 +239,9 @@ export const useSceneStore = create<SceneState>((set, get) => ({
             : state.currentScene,
       }));
     } catch (error: unknown) {
-      console.error("[SceneStore] updateScene error:", error);
+      logError(error, { source: "SceneStore", action: "updateScene" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.SCENE_SAVE_FAILED);
     }
   },
 
@@ -260,8 +266,9 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         currentScene: state.currentScene?.id === id ? null : state.currentScene,
       }));
     } catch (error: unknown) {
-      console.error("[SceneStore] deleteScene error:", error);
+      logError(error, { source: "SceneStore", action: "deleteScene" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.SCENE_DELETE_FAILED);
     }
   },
 
@@ -316,7 +323,8 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
           if (error) throw error;
         } catch (error: unknown) {
-          console.error("[SceneStore] Failed to save codePads:", error);
+          logError(error, { source: "SceneStore", action: "saveCodePads" });
+          toast.error(TOAST_MESSAGES.SCENE_SAVE_FAILED);
         }
       })();
     }
@@ -349,11 +357,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
         set({ isSaving: false });
       } catch (error: unknown) {
-        console.error("[SceneStore] saveSceneData error:", error);
+        logError(error, { source: "SceneStore", action: "saveExcalidrawData" });
         set({
           isSaving: false,
           error: getErrorMessage(error),
         });
+        toast.error(TOAST_MESSAGES.SCENE_SAVE_FAILED);
       }
     }, SAVE_DEBOUNCE_MS);
   },
@@ -392,10 +401,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       // Return the share URL
       const baseUrl = window.location.origin;
+      toast.success(TOAST_MESSAGES.SHARE_LINK_GENERATED);
       return `${baseUrl}/scene/${sceneId}/shared/${shareToken}`;
     } catch (error: unknown) {
-      console.error("[SceneStore] generateShareLink error:", error);
+      logError(error, { source: "SceneStore", action: "generateShareLink" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.SHARE_LINK_FAILED);
       return null;
     }
   },
@@ -429,7 +440,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       return { valid: false, permission: null, scene: null };
     } catch (error: unknown) {
-      console.error("[SceneStore] validateShareToken error:", error);
+      logError(error, { source: "SceneStore", action: "validateShareToken" });
       return { valid: false, permission: null, scene: null };
     }
   },
@@ -461,9 +472,12 @@ export const useSceneStore = create<SceneState>((set, get) => ({
             ? { ...state.currentScene, shareToken: null, sharePermission: "none" as SharePermission }
             : state.currentScene,
       }));
+
+      toast.success(TOAST_MESSAGES.SHARE_LINK_REVOKED);
     } catch (error: unknown) {
-      console.error("[SceneStore] revokeShareLink error:", error);
+      logError(error, { source: "SceneStore", action: "revokeShareLink" });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.SHARE_REVOKE_FAILED);
     }
   },
 

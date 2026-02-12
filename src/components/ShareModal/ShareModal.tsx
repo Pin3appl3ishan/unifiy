@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Link2, Copy, Check, Globe, Loader2 } from "lucide-react";
 import { useSceneStore } from "../../stores/sceneStore";
+import { logError } from "../../lib/logger";
 import { getErrorMessage } from "../../types";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../constants";
 
@@ -48,7 +49,7 @@ export default function ShareModal({
         throw new Error("Failed to generate link");
       }
     } catch (err: unknown) {
-      console.error("[ShareModal] Error generating link:", err);
+      logError(err, { source: "ShareModal", action: "generateShareLink" });
       setError(getErrorMessage(err));
     } finally {
       setIsGenerating(false);
@@ -63,7 +64,7 @@ export default function ShareModal({
       setCopied(true);
       setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
     } catch (err) {
-      console.error("[ShareModal] Failed to copy:", err);
+      logError(err, { source: "ShareModal", action: "copyLink" });
       setError("Failed to copy to clipboard");
     }
   };
@@ -76,7 +77,7 @@ export default function ShareModal({
       await revokeShareLink(sceneId);
       setShareUrl(null);
     } catch (err: unknown) {
-      console.error("[ShareModal] Error revoking link:", err);
+      logError(err, { source: "ShareModal", action: "revokeShareLink" });
       setError(getErrorMessage(err));
     } finally {
       setIsGenerating(false);

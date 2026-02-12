@@ -4,6 +4,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSceneStore } from "../../stores/sceneStore";
 import { useLocalSceneStore } from "../../stores/localSceneStore";
 import { useAuthStore } from "../../stores/authStore";
+import { logError } from "../../lib/logger";
 
 interface OnboardingModalProps {
   onComplete: () => void;
@@ -71,7 +72,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
       // 4. Complete onboarding
       onComplete();
     } catch (err: unknown) {
-      console.error("[OnboardingModal] Error:", err);
+      logError(err, { source: "OnboardingModal", action: "onboardingSubmit" });
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setIsCreating(false);
     }

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { logError } from '../lib/logger';
 import type { Profile, SupabaseProfile, ProfileUpdatePayload } from '../types';
 import { getErrorMessage } from '../types';
-import { SUPABASE_NOT_FOUND_CODE } from '../constants';
+import { SUPABASE_NOT_FOUND_CODE, TOAST_MESSAGES } from '../constants';
 
 // Re-export types for backward compatibility
 export type { Profile } from '../types';
@@ -125,8 +127,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     set({ loading: true });
 
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error: unknown) {
+      logError(error, { source: 'AuthStore', action: 'signOut' });
+      toast.error(TOAST_MESSAGES.SIGN_OUT_FAILED);
+    }
 
+    // Always clear local state even if the API call fails
     set({
       user: null,
       session: null,
@@ -217,7 +225,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ profile, profileLoading: false });
       return profile;
     } catch (error: unknown) {
-      console.error('[AuthStore] fetchProfile error:', error);
+      logError(error, { source: 'AuthStore', action: 'fetchProfile' });
       set({ profileLoading: false, error: getErrorMessage(error) });
       return null;
     }
@@ -254,8 +262,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           : null,
       }));
     } catch (error: unknown) {
-      console.error('[AuthStore] updateProfile error:', error);
+      logError(error, { source: 'AuthStore', action: 'updateProfile' });
       set({ error: getErrorMessage(error) });
+      toast.error(TOAST_MESSAGES.PROFILE_UPDATE_FAILED);
     }
   },
 

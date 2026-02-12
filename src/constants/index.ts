@@ -81,3 +81,39 @@ export const MS_PER_DAY = 86_400_000;
 
 export const GITHUB_URL = "https://github.com";
 export const DISCORD_URL = "https://discord.com";
+
+// -----------------------------------------------------------------------------
+// Toast Notifications
+// -----------------------------------------------------------------------------
+
+/** Default duration for toast notifications (ms) */
+export const TOAST_DURATION_MS = 4000;
+
+/** Toast messages for common operations */
+export const TOAST_MESSAGES = {
+  // Scene operations
+  SCENE_SAVE_FAILED: "Failed to save scene. Your changes may not be persisted.",
+  SCENE_FETCH_FAILED: "Failed to load scenes. Please try again.",
+  SCENE_CREATE_FAILED: "Failed to create scene.",
+  SCENE_DELETE_FAILED: "Failed to delete scene.",
+
+  // Workspace operations
+  WORKSPACE_FETCH_FAILED: "Failed to load workspaces.",
+  WORKSPACE_CREATE_FAILED: "Failed to create workspace.",
+  WORKSPACE_UPDATE_FAILED: "Failed to update workspace.",
+  WORKSPACE_DELETE_FAILED: "Failed to delete workspace.",
+
+  // Share operations
+  SHARE_LINK_GENERATED: "Share link created!",
+  SHARE_LINK_REVOKED: "Share link revoked.",
+  SHARE_LINK_FAILED: "Failed to generate share link.",
+  SHARE_REVOKE_FAILED: "Failed to revoke share link.",
+
+  // Auth operations
+  SIGN_OUT_FAILED: "Failed to sign out. Please try again.",
+  PROFILE_UPDATE_FAILED: "Failed to update profile.",
+
+  // Generic
+  NETWORK_ERROR: "Network error. Please check your connection and try again.",
+  UNEXPECTED_ERROR: "An unexpected error occurred.",
+} as const;
