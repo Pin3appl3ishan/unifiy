@@ -57,6 +57,10 @@ export default function Whiteboard({
   const excalidrawAPIRef = useRef<unknown>(null);
   const navigate = useNavigate();
 
+  // Canvas viewport state for CodePad positioning (pan + zoom tracking)
+  const [canvasView, setCanvasView] = useState({ scrollX: 0, scrollY: 0, zoom: 1 });
+  const canvasViewRef = useRef({ scrollX: 0, scrollY: 0, zoom: 1 });
+
   // Local scene store (anonymous users)
   const localScene = useLocalSceneStore((s) => s.scene);
   const localSaveExcalidrawData = useLocalSceneStore((s) => s.saveExcalidrawData);
@@ -102,8 +106,10 @@ export default function Whiteboard({
   const handleAddCodePad = useCallback(() => {
     if (!canAddCodePad) return;
 
-    const centerX = window.innerWidth / 2 - 200;
-    const centerY = window.innerHeight / 2 - 150;
+    // Convert screen center to canvas coordinates
+    const { scrollX, scrollY, zoom } = canvasViewRef.current;
+    const centerX = (window.innerWidth / 2) / zoom - scrollX - CODEPAD_DEFAULT_WIDTH / 2;
+    const centerY = (window.innerHeight / 2) / zoom - scrollY - CODEPAD_DEFAULT_HEIGHT / 2;
 
     if (isAnonymous) {
       localAddCodePad(centerX, centerY);
@@ -186,6 +192,20 @@ export default function Whiteboard({
       if (appState.theme) {
         setIsDarkMode(appState.theme === "dark");
       }
+
+      // Track scroll/zoom for CodePad positioning (immediate, not debounced)
+      const zoomValue = typeof appState.zoom === 'object'
+        ? (appState.zoom as { value: number }).value
+        : (appState.zoom as number);
+      const newView = { scrollX: appState.scrollX, scrollY: appState.scrollY, zoom: zoomValue };
+      canvasViewRef.current = newView;
+      // Only trigger re-render when values actually changed (avoids infinite loop)
+      setCanvasView(prev => {
+        if (prev.scrollX === newView.scrollX && prev.scrollY === newView.scrollY && prev.zoom === newView.zoom) {
+          return prev;
+        }
+        return newView;
+      });
 
       // Debounce saves
       if (saveTimeoutRef.current) {
@@ -475,6 +495,9 @@ export default function Whiteboard({
           codePad={codePad}
           isDarkMode={isDarkMode}
           isReadOnly={isSharedView || viewModeEnabled}
+          scrollX={canvasView.scrollX}
+          scrollY={canvasView.scrollY}
+          zoom={canvasView.zoom}
           onUpdate={codePadHandlers[codePad.id]?.onUpdate}
           onRemove={codePadHandlers[codePad.id]?.onRemove}
         />
@@ -488,7 +511,7 @@ export default function Whiteboard({
             top: "17px",
             left: "54.5%",
             transform: "translateX(calc(50% + 200px))",
-            zIndex: 100,
+            zIndex: 3,
           }}
         >
         <div

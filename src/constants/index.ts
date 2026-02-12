@@ -36,6 +36,19 @@ export const CODEPAD_MIN_HEIGHT = 150;
 export const CODEPAD_DEFAULT_CODE = "// Start coding here...\n";
 export const CODEPAD_DEFAULT_LANGUAGE = "javascript";
 
+/** Supported CodePad languages with display metadata */
+export const CODEPAD_LANGUAGES = {
+  javascript: { label: "JavaScript", badge: "JS", badgeBg: "bg-amber-500", textColor: "text-amber-400" },
+  python:     { label: "Python",     badge: "PY", badgeBg: "bg-blue-500",  textColor: "text-blue-400" },
+  html:       { label: "HTML",       badge: "HTML", badgeBg: "bg-orange-500", textColor: "text-orange-400" },
+  css:        { label: "CSS",        badge: "CSS", badgeBg: "bg-purple-500", textColor: "text-purple-400" },
+  json:       { label: "JSON",       badge: "JSON", badgeBg: "bg-green-500", textColor: "text-green-400" },
+  java:       { label: "Java",       badge: "JV", badgeBg: "bg-red-500",   textColor: "text-red-400" },
+  markdown:   { label: "Markdown",   badge: "MD", badgeBg: "bg-slate-500", textColor: "text-slate-400" },
+} as const;
+
+export type CodePadLanguage = keyof typeof CODEPAD_LANGUAGES;
+
 // -----------------------------------------------------------------------------
 // ID Generation
 // -----------------------------------------------------------------------------
