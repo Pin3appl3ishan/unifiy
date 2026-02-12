@@ -4,6 +4,7 @@ import { LogOut, FileText, Clock, ArrowRight, Lock, Plus } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useSceneStore } from "../stores/sceneStore";
+import { DEFAULT_SCENE_NAME, MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from "../constants";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher/WorkspaceSwitcher";
 import CreateWorkspaceModal from "../components/Workspace/CreateWorkspaceModal";
 
@@ -45,7 +46,7 @@ export default function Dashboard() {
 
   const handleCreateScene = async () => {
     if (!currentWorkspace) return;
-    const scene = await createScene(currentWorkspace.id, "Untitled Scene");
+    const scene = await createScene(currentWorkspace.id, DEFAULT_SCENE_NAME);
     if (scene) {
       navigate(`/scene/${scene.id}`);
     }
@@ -65,9 +66,9 @@ export default function Dashboard() {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
+    const diffHours = Math.floor(diffMs / MS_PER_HOUR);
+    const diffDays = Math.floor(diffMs / MS_PER_DAY);
 
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins} min ago`;

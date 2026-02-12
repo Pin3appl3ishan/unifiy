@@ -1,23 +1,11 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
+import type { Workspace, SupabaseWorkspace, UserTier } from "../types";
+import { getErrorMessage } from "../types";
+import { MAX_WORKSPACES_FREE } from "../constants";
 
-// Types
-export interface Workspace {
-  id: string;
-  ownerId: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Supabase row type
-interface SupabaseWorkspace {
-  id: string;
-  owner_id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
+// Re-export types for backward compatibility
+export type { Workspace } from "../types";
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -35,10 +23,14 @@ interface WorkspaceState {
   reset: () => void;
 
   // Helpers
-  canCreateWorkspace: (tier: "free" | "premium") => boolean;
+  canCreateWorkspace: (tier: UserTier) => boolean;
 }
 
-// Convert Supabase row to Workspace
+/**
+ * Converts a Supabase workspace row (snake_case) to the app-level Workspace model (camelCase).
+ * @param row - The raw Supabase row
+ * @returns A Workspace object
+ */
 const toWorkspace = (row: SupabaseWorkspace): Workspace => ({
   id: row.id,
   ownerId: row.owner_id,
@@ -53,6 +45,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  /**
+   * Fetches all workspaces owned by the current user.
+   * Auto-selects the first workspace if none is currently selected.
+   */
   fetchWorkspaces: async () => {
     set({ isLoading: true, error: null });
 
@@ -64,7 +60,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         .from("workspaces")
         .select("*")
         .eq("owner_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .returns<SupabaseWorkspace[]>();
 
       if (error) throw error;
 
@@ -79,15 +76,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (workspaces.length > 0 && !get().currentWorkspace) {
         set({ currentWorkspace: workspaces[0] });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[WorkspaceStore] fetchWorkspaces error:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to fetch workspaces",
+        error: getErrorMessage(error),
       });
     }
   },
 
+  /**
+   * Creates a new workspace and sets it as the current workspace.
+   * @param name - The name for the new workspace
+   * @returns The created Workspace, or null on error
+   */
   createWorkspace: async (name: string) => {
     set({ isLoading: true, error: null });
 
@@ -106,7 +108,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       if (error) throw error;
 
-      const workspace = toWorkspace(data);
+      const workspace = toWorkspace(data as SupabaseWorkspace);
 
       set((state) => ({
         workspaces: [workspace, ...state.workspaces],
@@ -115,16 +117,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }));
 
       return workspace;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[WorkspaceStore] createWorkspace error:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to create workspace",
+        error: getErrorMessage(error),
       });
       return null;
     }
   },
 
+  /**
+   * Sets the current workspace by ID from the existing workspaces list.
+   * @param id - The workspace ID to select
+   */
   setCurrentWorkspace: (id: string) => {
     const workspace = get().workspaces.find((w) => w.id === id);
     if (workspace) {
@@ -132,6 +138,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
+  /**
+   * Updates a workspace's name in Supabase.
+   * @param id - The workspace ID to update
+   * @param updates - Partial workspace fields to update (currently only name)
+   */
   updateWorkspace: async (id: string, updates: Partial<Pick<Workspace, "name">>) => {
     set({ error: null });
 
@@ -155,12 +166,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             ? { ...state.currentWorkspace, ...updates, updatedAt: new Date().toISOString() }
             : state.currentWorkspace,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[WorkspaceStore] updateWorkspace error:", error);
-      set({ error: error.message || "Failed to update workspace" });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /**
+   * Permanently deletes a workspace by ID.
+   * If the deleted workspace is the current one, selects the next available workspace.
+   * @param id - The workspace ID to delete
+   */
   deleteWorkspace: async (id: string) => {
     set({ error: null });
 
@@ -182,14 +198,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               : state.currentWorkspace,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[WorkspaceStore] deleteWorkspace error:", error);
-      set({ error: error.message || "Failed to delete workspace" });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /** Clears the current error state. */
   clearError: () => set({ error: null }),
 
+  /**
+   * Resets all workspace state to initial values.
+   */
   reset: () => set({
     workspaces: [],
     currentWorkspace: null,
@@ -197,9 +217,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     error: null,
   }),
 
-  canCreateWorkspace: (tier: "free" | "premium") => {
+  /**
+   * Checks whether the user can create a new workspace based on their tier.
+   * Free-tier users are limited to a maximum number of workspaces.
+   * @param tier - The user's subscription tier
+   * @returns True if the user can create another workspace
+   */
+  canCreateWorkspace: (tier: UserTier) => {
     const { workspaces } = get();
     if (tier === "premium") return true;
-    return workspaces.length < 1; // Free tier: max 1 workspace
+    return workspaces.length < MAX_WORKSPACES_FREE;
   },
 }));

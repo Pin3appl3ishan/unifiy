@@ -70,9 +70,9 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
 
       // 4. Complete onboarding
       onComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[OnboardingModal] Error:", err);
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setIsCreating(false);
     }
   };

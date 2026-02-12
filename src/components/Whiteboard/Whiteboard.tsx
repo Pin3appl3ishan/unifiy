@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, type ComponentProps } from "react";
 import { useNavigate } from "react-router-dom";
 import { Excalidraw, MainMenu, WelcomeScreen } from "@excalidraw/excalidraw";
 import {
@@ -12,14 +12,27 @@ import {
   Code,
   Lock,
 } from "lucide-react";
-import { useLocalSceneStore, CodePad as CodePadType } from "../../stores/localSceneStore";
-import { useSceneStore, Scene } from "../../stores/sceneStore";
+import { useLocalSceneStore } from "../../stores/localSceneStore";
+import { useSceneStore } from "../../stores/sceneStore";
 import { useAuthStore } from "../../stores/authStore";
+import type { CodePad as CodePadType, ExcalidrawData, Scene } from "../../types";
+import {
+  MAX_CODEPADS_FREE,
+  CHANGE_DEBOUNCE_MS,
+  CODEPAD_DEFAULT_WIDTH,
+  CODEPAD_DEFAULT_HEIGHT,
+  CODEPAD_DEFAULT_CODE,
+  CODEPAD_DEFAULT_LANGUAGE,
+  CODEPAD_MIN_WIDTH,
+  CODEPAD_MIN_HEIGHT,
+  GITHUB_URL,
+  DISCORD_URL,
+} from "../../constants";
 import CodePad from "../CodePad/CodePad";
 import ShareModal from "../ShareModal/ShareModal";
 
-// Tier-based CodePad limits
-const MAX_CODEPADS_FREE = 3;
+/** Excalidraw onChange callback type, derived from the component's props */
+type ExcalidrawOnChange = NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
 
 interface WhiteboardProps {
   sceneId?: string; // For logged-in users with remote scenes
@@ -41,7 +54,7 @@ export default function Whiteboard({
   const [editedName, setEditedName] = useState("");
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const excalidrawAPIRef = useRef<any>(null);
+  const excalidrawAPIRef = useRef<unknown>(null);
   const navigate = useNavigate();
 
   // Local scene store (anonymous users)
@@ -75,7 +88,7 @@ export default function Whiteboard({
 
   // Save handler based on mode
   const handleSaveExcalidrawData = useCallback(
-    (data: any) => {
+    (data: ExcalidrawData | null) => {
       if (isAnonymous) {
         localSaveExcalidrawData(data);
       } else if (sceneId) {
@@ -101,10 +114,10 @@ export default function Whiteboard({
         id: crypto.randomUUID(),
         x: centerX,
         y: centerY,
-        width: 400,
-        height: 300,
-        code: "// Start coding here...\n",
-        language: "javascript",
+        width: CODEPAD_DEFAULT_WIDTH,
+        height: CODEPAD_DEFAULT_HEIGHT,
+        code: CODEPAD_DEFAULT_CODE,
+        language: CODEPAD_DEFAULT_LANGUAGE,
         isMinimized: false,
       };
       remoteSaveSceneData(sceneId, {
@@ -118,10 +131,10 @@ export default function Whiteboard({
       // Clamp resize values at state level to prevent invalid sizes
       const clampedUpdates = { ...updates };
       if (clampedUpdates.width !== undefined) {
-        clampedUpdates.width = Math.max(250, Math.min(clampedUpdates.width, window.innerWidth - 40));
+        clampedUpdates.width = Math.max(CODEPAD_MIN_WIDTH, Math.min(clampedUpdates.width, window.innerWidth - 40));
       }
       if (clampedUpdates.height !== undefined) {
-        clampedUpdates.height = Math.max(150, Math.min(clampedUpdates.height, window.innerHeight - 40));
+        clampedUpdates.height = Math.max(CODEPAD_MIN_HEIGHT, Math.min(clampedUpdates.height, window.innerHeight - 40));
       }
 
       if (isAnonymous) {
@@ -167,8 +180,8 @@ export default function Whiteboard({
   // Auto-save with debounce
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleChange = useCallback(
-    (elements: readonly any[], appState: any) => {
+  const handleChange = useCallback<ExcalidrawOnChange>(
+    (elements, appState) => {
       // Track dark mode from Excalidraw
       if (appState.theme) {
         setIsDarkMode(appState.theme === "dark");
@@ -181,7 +194,7 @@ export default function Whiteboard({
 
       saveTimeoutRef.current = setTimeout(() => {
         handleSaveExcalidrawData({
-          elements,
+          elements: elements as unknown as Record<string, unknown>[],
           appState: {
             viewBackgroundColor: appState.viewBackgroundColor,
             currentItemFontFamily: appState.currentItemFontFamily,
@@ -190,7 +203,7 @@ export default function Whiteboard({
             scrollY: appState.scrollY,
           },
         });
-      }, 500);
+      }, CHANGE_DEBOUNCE_MS);
     },
     [handleSaveExcalidrawData]
   );
@@ -328,7 +341,7 @@ export default function Whiteboard({
       {/* Excalidraw Canvas */}
       <div className="excalidraw-wrapper">
         <Excalidraw
-          initialData={sceneExcalidrawData || undefined}
+          initialData={(sceneExcalidrawData || undefined) as ComponentProps<typeof Excalidraw>["initialData"]}
           onChange={viewModeEnabled ? undefined : handleChange}
           theme={isDarkMode ? "dark" : "light"}
           viewModeEnabled={viewModeEnabled}
@@ -399,13 +412,13 @@ export default function Whiteboard({
               U&I Plus
             </MainMenu.Item>
             <MainMenu.ItemLink
-              href="https://github.com"
+              href={GITHUB_URL}
               icon={<Github size={iconSize} />}
             >
               GitHub
             </MainMenu.ItemLink>
             <MainMenu.ItemLink
-              href="https://discord.com"
+              href={DISCORD_URL}
               icon={<MessageCircle size={iconSize} />}
             >
               Discord

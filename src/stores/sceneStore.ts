@@ -1,32 +1,19 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
-import { CodePad } from "./localSceneStore";
+import type {
+  CodePad,
+  Scene,
+  SupabaseScene,
+  ExcalidrawData,
+  SceneUpdatePayload,
+  ShareValidationResult,
+  SharePermission,
+} from "../types";
+import { getErrorMessage } from "../types";
+import { SAVE_DEBOUNCE_MS, DEFAULT_SCENE_NAME } from "../constants";
 
-// Types
-export interface Scene {
-  id: string;
-  workspaceId: string;
-  name: string;
-  excalidrawData: any;
-  codePads: CodePad[];
-  shareToken: string | null;
-  sharePermission: "none" | "view" | "edit";
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Supabase row type
-interface SupabaseScene {
-  id: string;
-  workspace_id: string;
-  name: string;
-  excalidraw_data: any;
-  codepads: CodePad[] | null;
-  share_token: string | null;
-  share_permission: "none" | "view" | "edit";
-  created_at: string;
-  updated_at: string;
-}
+// Re-export types for backward compatibility
+export type { Scene } from "../types";
 
 interface SceneState {
   scenes: Scene[];
@@ -41,25 +28,30 @@ interface SceneState {
   createScene: (
     workspaceId: string,
     name?: string,
-    data?: { excalidrawData?: any; codePads?: CodePad[] }
+    data?: { excalidrawData?: ExcalidrawData | null; codePads?: CodePad[] }
   ) => Promise<Scene | null>;
   updateScene: (id: string, updates: Partial<Pick<Scene, "name" | "excalidrawData" | "codePads">>) => Promise<void>;
   deleteScene: (id: string) => Promise<void>;
   setCurrentScene: (id: string | null) => void;
 
   // Debounced save for real-time editing
-  saveSceneData: (id: string, data: { excalidrawData?: any; codePads?: CodePad[] }) => void;
+  saveSceneData: (id: string, data: { excalidrawData?: ExcalidrawData | null; codePads?: CodePad[] }) => void;
 
   // Share functionality
   generateShareLink: (sceneId: string, permission?: "view" | "edit") => Promise<string | null>;
-  validateShareToken: (sceneId: string, token: string) => Promise<{ valid: boolean; permission: "view" | "edit" | null; scene: Scene | null }>;
+  validateShareToken: (sceneId: string, token: string) => Promise<ShareValidationResult>;
   revokeShareLink: (sceneId: string) => Promise<void>;
 
   clearError: () => void;
   reset: () => void;
 }
 
-// Convert Supabase row to Scene
+/**
+ * Converts a Supabase scene row (snake_case) to the app-level Scene model (camelCase).
+ * Handles codepads that may be a JSON string or an array depending on column type.
+ * @param row - The raw Supabase row
+ * @returns A Scene object
+ */
 const toScene = (row: SupabaseScene): Scene => {
   // Handle codepads - might be string (text column) or array (jsonb column)
   let codePads: CodePad[] = [];
@@ -90,7 +82,6 @@ const toScene = (row: SupabaseScene): Scene => {
 
 // Debounce helper
 let saveTimeout: NodeJS.Timeout | null = null;
-const SAVE_DEBOUNCE = 1000;
 
 export const useSceneStore = create<SceneState>((set, get) => ({
   scenes: [],
@@ -99,6 +90,10 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   isSaving: false,
   error: null,
 
+  /**
+   * Fetches all scenes for a given workspace, ordered by most recently updated.
+   * @param workspaceId - The workspace to fetch scenes for
+   */
   fetchScenes: async (workspaceId: string) => {
     set({ isLoading: true, error: null });
 
@@ -107,21 +102,28 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         .from("scenes")
         .select("*")
         .eq("workspace_id", workspaceId)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false })
+        .returns<SupabaseScene[]>();
 
       if (error) throw error;
 
       const scenes = (data || []).map(toScene);
       set({ scenes, isLoading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] fetchScenes error:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to fetch scenes",
+        error: getErrorMessage(error),
       });
     }
   },
 
+  /**
+   * Fetches a single scene by ID and sets it as the current scene.
+   * If the scene is already in the local list, it updates the existing entry.
+   * @param id - The scene ID
+   * @returns The fetched Scene, or null on error
+   */
   fetchScene: async (id: string) => {
     set({ isLoading: true, error: null });
 
@@ -134,7 +136,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       if (error) throw error;
 
-      const scene = toScene(data);
+      const scene = toScene(data as SupabaseScene);
       set((state) => ({
         currentScene: scene,
         scenes: state.scenes.some((s) => s.id === id)
@@ -144,16 +146,23 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       }));
 
       return scene;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] fetchScene error:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to fetch scene",
+        error: getErrorMessage(error),
       });
       return null;
     }
   },
 
+  /**
+   * Creates a new scene in a workspace and sets it as the current scene.
+   * @param workspaceId - The workspace to create the scene in
+   * @param name - Optional scene name (defaults to "Untitled Scene")
+   * @param data - Optional initial excalidraw data and codePads
+   * @returns The created Scene, or null on error
+   */
   createScene: async (workspaceId, name, data) => {
     set({ isLoading: true, error: null });
 
@@ -162,17 +171,17 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         .from("scenes")
         .insert({
           workspace_id: workspaceId,
-          name: name || "Untitled Scene",
+          name: name || DEFAULT_SCENE_NAME,
           excalidraw_data: data?.excalidrawData || null,
           codepads: data?.codePads || [],
-          share_permission: "none",
+          share_permission: "none" as SharePermission,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      const scene = toScene(insertData);
+      const scene = toScene(insertData as SupabaseScene);
 
       set((state) => ({
         scenes: [scene, ...state.scenes],
@@ -181,21 +190,26 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       }));
 
       return scene;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] createScene error:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to create scene",
+        error: getErrorMessage(error),
       });
       return null;
     }
   },
 
+  /**
+   * Updates a scene's name, excalidraw data, and/or codePads.
+   * @param id - The scene ID to update
+   * @param updates - Partial scene fields (name, excalidrawData, codePads)
+   */
   updateScene: async (id, updates) => {
     set({ error: null });
 
     try {
-      const updatePayload: any = {
+      const updatePayload: SceneUpdatePayload = {
         updated_at: new Date().toISOString(),
       };
 
@@ -219,12 +233,17 @@ export const useSceneStore = create<SceneState>((set, get) => ({
             ? { ...state.currentScene, ...updates, updatedAt: new Date().toISOString() }
             : state.currentScene,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] updateScene error:", error);
-      set({ error: error.message || "Failed to update scene" });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /**
+   * Permanently deletes a scene by ID.
+   * If the deleted scene is the current scene, clears the current scene.
+   * @param id - The scene ID to delete
+   */
   deleteScene: async (id: string) => {
     set({ error: null });
 
@@ -240,12 +259,17 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         scenes: state.scenes.filter((s) => s.id !== id),
         currentScene: state.currentScene?.id === id ? null : state.currentScene,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] deleteScene error:", error);
-      set({ error: error.message || "Failed to delete scene" });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /**
+   * Sets the current scene by ID from the existing scenes list.
+   * Pass null to clear the current scene.
+   * @param id - The scene ID, or null to clear
+   */
   setCurrentScene: (id: string | null) => {
     if (!id) {
       set({ currentScene: null });
@@ -257,8 +281,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     }
   },
 
-  // Debounced save for real-time editing
-  saveSceneData: (id: string, data: { excalidrawData?: any; codePads?: CodePad[] }) => {
+  /**
+   * Saves scene data with debouncing for excalidraw data and immediate saves for codePads.
+   * Updates local state immediately for a responsive UI, then persists to Supabase.
+   * @param id - The scene ID
+   * @param data - Object containing excalidrawData and/or codePads to save
+   */
+  saveSceneData: (id: string, data: { excalidrawData?: ExcalidrawData | null; codePads?: CodePad[] }) => {
     // Update local state immediately
     set((state) => ({
       scenes: state.scenes.map((s) =>
@@ -286,7 +315,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
             .single();
 
           if (error) throw error;
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("[SceneStore] Failed to save codePads:", error);
         }
       })();
@@ -305,7 +334,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
     saveTimeout = setTimeout(async () => {
       try {
-        const updatePayload: any = {
+        const updatePayload: SceneUpdatePayload = {
           updated_at: new Date().toISOString(),
         };
 
@@ -319,17 +348,22 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         if (error) throw error;
 
         set({ isSaving: false });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[SceneStore] saveSceneData error:", error);
         set({
           isSaving: false,
-          error: error.message || "Failed to save scene",
+          error: getErrorMessage(error),
         });
       }
-    }, SAVE_DEBOUNCE);
+    }, SAVE_DEBOUNCE_MS);
   },
 
-  // Generate a share link for a scene
+  /**
+   * Generates a shareable link for a scene by creating a share token.
+   * @param sceneId - The scene ID to share
+   * @param permission - Permission level for the share link (defaults to "view")
+   * @returns The full share URL, or null on error
+   */
   generateShareLink: async (sceneId: string, permission: "view" | "edit" = "view") => {
     try {
       const shareToken = crypto.randomUUID();
@@ -359,14 +393,19 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       // Return the share URL
       const baseUrl = window.location.origin;
       return `${baseUrl}/scene/${sceneId}/shared/${shareToken}`;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] generateShareLink error:", error);
-      set({ error: error.message || "Failed to generate share link" });
+      set({ error: getErrorMessage(error) });
       return null;
     }
   },
 
-  // Validate a share token and return the scene if valid
+  /**
+   * Validates a share token against a scene and returns the scene if valid.
+   * @param sceneId - The scene ID to validate against
+   * @param token - The share token to check
+   * @returns A ShareValidationResult with validity, permission, and scene data
+   */
   validateShareToken: async (sceneId: string, token: string) => {
     try {
       const { data, error } = await supabase
@@ -377,7 +416,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       if (error) throw error;
 
-      const scene = toScene(data);
+      const scene = toScene(data as SupabaseScene);
 
       // Check if token matches and sharing is enabled
       if (scene.shareToken === token && scene.sharePermission !== "none") {
@@ -389,20 +428,23 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       }
 
       return { valid: false, permission: null, scene: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] validateShareToken error:", error);
       return { valid: false, permission: null, scene: null };
     }
   },
 
-  // Revoke share link (disable sharing)
+  /**
+   * Revokes a scene's share link by clearing the token and resetting permissions.
+   * @param sceneId - The scene ID to revoke sharing for
+   */
   revokeShareLink: async (sceneId: string) => {
     try {
       const { error } = await supabase
         .from("scenes")
         .update({
           share_token: null,
-          share_permission: "none",
+          share_permission: "none" as SharePermission,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
@@ -412,21 +454,25 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       // Update local state
       set((state) => ({
         scenes: state.scenes.map((s) =>
-          s.id === sceneId ? { ...s, shareToken: null, sharePermission: "none" } : s
+          s.id === sceneId ? { ...s, shareToken: null, sharePermission: "none" as SharePermission } : s
         ),
         currentScene:
           state.currentScene?.id === sceneId
-            ? { ...state.currentScene, shareToken: null, sharePermission: "none" }
+            ? { ...state.currentScene, shareToken: null, sharePermission: "none" as SharePermission }
             : state.currentScene,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[SceneStore] revokeShareLink error:", error);
-      set({ error: error.message || "Failed to revoke share link" });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /** Clears the current error state. */
   clearError: () => set({ error: null }),
 
+  /**
+   * Resets all scene state to initial values and clears any pending save timeout.
+   */
   reset: () => {
     if (saveTimeout) {
       clearTimeout(saveTimeout);

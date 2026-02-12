@@ -1,22 +1,12 @@
 import { create } from 'zustand';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import type { Profile, SupabaseProfile, ProfileUpdatePayload } from '../types';
+import { getErrorMessage } from '../types';
+import { SUPABASE_NOT_FOUND_CODE } from '../constants';
 
-// Profile type matching Supabase profiles table
-export interface Profile {
-  id: string;
-  tier: 'free' | 'premium';
-  currentWorkspaceId: string | null;
-  onboardingComplete: boolean;
-}
-
-// Supabase row type
-interface SupabaseProfile {
-  id: string;
-  tier: 'free' | 'premium';
-  current_workspace_id: string | null;
-  onboarding_complete: boolean;
-}
+// Re-export types for backward compatibility
+export type { Profile } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -39,7 +29,11 @@ interface AuthState {
   clearError: () => void;
 }
 
-// Convert Supabase row to Profile
+/**
+ * Converts a Supabase profile row (snake_case) to the app-level Profile model (camelCase).
+ * @param row - The raw Supabase row
+ * @returns A Profile object
+ */
 const toProfile = (row: SupabaseProfile): Profile => ({
   id: row.id,
   tier: row.tier,
@@ -55,6 +49,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profileLoading: false,
   error: null,
 
+  /**
+   * Registers a new user with email and password.
+   * Automatically fetches the user profile after successful signup.
+   * @param email - The user's email address
+   * @param password - The user's password
+   * @returns An object with `error` (null on success, AuthError on failure)
+   */
   signUp: async (email: string, password: string) => {
     set({ loading: true, error: null });
 
@@ -83,6 +84,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return { error: null };
   },
 
+  /**
+   * Signs in an existing user with email and password.
+   * Automatically fetches the user profile after successful login.
+   * @param email - The user's email address
+   * @param password - The user's password
+   * @returns An object with `error` (null on success, AuthError on failure)
+   */
   signIn: async (email: string, password: string) => {
     set({ loading: true, error: null });
 
@@ -111,6 +119,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return { error: null };
   },
 
+  /**
+   * Signs out the current user and clears all auth state.
+   */
   signOut: async () => {
     set({ loading: true });
 
@@ -125,6 +136,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
+  /**
+   * Initializes auth state by restoring the current session and
+   * subscribing to auth state changes (e.g., tab switches, token refresh).
+   */
   initialize: async () => {
     set({ loading: true });
 
@@ -170,6 +185,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
+  /**
+   * Fetches the current user's profile from Supabase.
+   * Handles the case where a profile may not yet exist for new users.
+   * @returns The Profile, or null if not found or on error
+   */
   fetchProfile: async () => {
     const user = get().user;
     if (!user) return null;
@@ -185,7 +205,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         // Profile might not exist yet (new user)
-        if (error.code === 'PGRST116') {
+        if (error.code === SUPABASE_NOT_FOUND_CODE) {
           console.log('[AuthStore] Profile not found, may need to create one');
           set({ profileLoading: false });
           return null;
@@ -193,22 +213,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw error;
       }
 
-      const profile = toProfile(data);
+      const profile = toProfile(data as SupabaseProfile);
       set({ profile, profileLoading: false });
       return profile;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[AuthStore] fetchProfile error:', error);
-      set({ profileLoading: false, error: error.message });
+      set({ profileLoading: false, error: getErrorMessage(error) });
       return null;
     }
   },
 
+  /**
+   * Updates the current user's profile fields in Supabase.
+   * @param updates - Partial profile fields to update (currentWorkspaceId, onboardingComplete)
+   */
   updateProfile: async (updates) => {
     const user = get().user;
     if (!user) return;
 
     try {
-      const updatePayload: any = {};
+      const updatePayload: ProfileUpdatePayload = {};
 
       if (updates.currentWorkspaceId !== undefined) {
         updatePayload.current_workspace_id = updates.currentWorkspaceId;
@@ -229,11 +253,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           ? { ...state.profile, ...updates }
           : null,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[AuthStore] updateProfile error:', error);
-      set({ error: error.message });
+      set({ error: getErrorMessage(error) });
     }
   },
 
+  /** Clears the current error state. */
   clearError: () => set({ error: null }),
 }));

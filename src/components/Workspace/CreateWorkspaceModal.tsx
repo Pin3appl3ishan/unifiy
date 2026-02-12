@@ -40,9 +40,9 @@ export default function CreateWorkspaceModal({
       // Reset form and close
       setWorkspaceName("");
       onCreated(workspace);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[CreateWorkspaceModal] Error:", err);
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setIsCreating(false);
     }
