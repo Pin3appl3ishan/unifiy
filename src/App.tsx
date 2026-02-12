@@ -1,8 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
 import ProtectedRoute from "./components/ProtectedRoute";
-import OnboardingModal from "./components/Onboarding/OnboardingModal";
 import { PageSpinner } from "./components/ui/Spinner";
 
 const Login = lazy(() => import("./pages/Login"));
@@ -11,6 +10,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Canvas = lazy(() => import("./pages/Canvas"));
 const SharedScene = lazy(() => import("./pages/SharedScene"));
 const Landing = lazy(() => import("./pages/Landing"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
 
 // Root route: logged-in → dashboard, anonymous → canvas
 function RootRoute() {
@@ -29,19 +29,9 @@ function RootRoute() {
   return <Canvas isAnonymous />;
 }
 
-// Wrapper for authenticated routes - handles onboarding
+// Wrapper for authenticated routes - redirects to onboarding if incomplete
 function AuthenticatedRoutes() {
   const { profile, profileLoading } = useAuthStore();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    // Show onboarding if profile exists but onboardingComplete is false
-    if (profile && !profile.onboardingComplete) {
-      setShowOnboarding(true);
-    } else if (profile?.onboardingComplete) {
-      setShowOnboarding(false);
-    }
-  }, [profile]);
 
   // Only show loading if we have no profile AND are actively loading
   // If we already have a profile, keep showing the app (even if refreshing in background)
@@ -50,13 +40,9 @@ function AuthenticatedRoutes() {
     return <PageSpinner label="Loading your profile..." />;
   }
 
-  // Show onboarding modal if needed
-  if (showOnboarding) {
-    return (
-      <OnboardingModal
-        onComplete={() => setShowOnboarding(false)}
-      />
-    );
+  // Redirect to onboarding if not completed
+  if (profile && !profile.onboardingComplete) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   // Render child routes
@@ -89,6 +75,9 @@ export default function App() {
 
         {/* Shared scene - public access via share token */}
         <Route path="/scene/:sceneId/shared/:token" element={<SharedScene />} />
+
+        {/* Onboarding - protected but outside onboarding check */}
+        <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
 
         {/* Protected routes - wrapped with onboarding check */}
         <Route element={<ProtectedRoute><AuthenticatedRoutes /></ProtectedRoute>}>
